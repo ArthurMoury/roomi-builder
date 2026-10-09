@@ -57,7 +57,7 @@ function readAnalysis(v: unknown): Analysis {
 export function parseSketch(text: string): { hotelName: string; items: SketchItem[]; invalid: number } & Analysis {
   let data: { app?: unknown; hotelName?: unknown; items?: unknown; analysis?: unknown }
   try { data = JSON.parse(text) } catch { throw new Error('O arquivo não é um JSON válido.') }
-  if ((data?.app !== APP && data?.app !== OLD_APP) || !Array.isArray(data.items)) throw new Error('O arquivo não é um esboço do Builder.')
+  if ((data?.app !== APP && data?.app !== OLD_APP) || !Array.isArray(data.items)) throw new Error('O arquivo não é um esboço do Maker.')
   const items = data.items.filter(isItem)
   return {
     hotelName: typeof data.hotelName === 'string' ? data.hotelName.trim() : '', // sem nome, o questionário pergunta

@@ -120,7 +120,7 @@ input { font: inherit; color: inherit; }
   transition: background-color 0.2s;
 }
 .brand:hover .logo { background: var(--accent); }
-.brand span:last-child { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.brand span:last-child { align-self: flex-end; line-height: 1; margin-bottom: -1px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
 .project { flex: 1; min-width: 0; border-left: 1px solid var(--line); padding: 4px 16px; font-family: var(--font-display); font-size: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .project.empty { color: var(--muted); }
 .btn { height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
@@ -160,7 +160,7 @@ input { font: inherit; color: inherit; }
 .crumb b { font-family: var(--font-display); font-weight: 400; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .crumb:hover { border-color: var(--fg); }
 .crumb.on { border-color: var(--accent); outline: 1px solid var(--accent); }
-.quiz { position: relative; display: grid; grid-template-columns: 104px minmax(0, 1fr) 300px; min-height: 136px; border: 1px solid var(--line); border-radius: 4px; }
+.quiz { position: relative; display: grid; grid-template-columns: 104px minmax(0, 1fr) 340px; min-height: 136px; border: 1px solid var(--line); border-radius: 4px; }
 .q-count { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 0 18px; border-right: 1px solid var(--line); }
 .q-count .nm b { font-family: var(--font-display); font-weight: 200; font-size: 48px; line-height: .9; color: var(--num); }
 .q-count .nm i { font: 500 12px var(--font-sans); color: var(--muted); margin-left: 3px; }
@@ -273,7 +273,7 @@ input { font: inherit; color: inherit; }
 .lockup { display: flex; align-items: center; gap: 16px; }
 .lockup .wm { width: 107px; height: 21px; background: #F1E9E7; }
 .lockup i { width: 1px; height: 30px; background: rgba(241, 233, 231, .4); }
-.lockup span:last-child { font-family: var(--font-display); font-size: 23px; }
+.lockup span:last-child { align-self: flex-end; line-height: 1; font-family: var(--font-display); font-size: 23px; }
 .lockup.ink .wm { background: #1D1D1B; }
 .lockup.ink i { background: rgba(29, 29, 27, .4); }
 .cover-title { display: flex; flex-direction: column; margin-top: 128px; }

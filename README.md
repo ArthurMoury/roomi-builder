@@ -1,22 +1,22 @@
-# Roomi Builder
+# Roomi Maker
 
-Simulador de resorts em 3D para a visão de negócios. Uma LP apresenta o produto; no Builder, um questionário monta o hotel sozinho num terreno de 4 hectares, um checklist confirma o escopo e o relatório sai em folhas A4 com investimento, operação e retorno em 10 anos.
+Simulador de resorts em 3D para a visão de negócios. Uma LP apresenta o produto; no Maker, um questionário monta o hotel sozinho num terreno de 4 hectares, um checklist confirma o escopo e o relatório sai em folhas A4 com investimento, operação e retorno em 10 anos.
 
 ```bash
 npm install
 npm run dev
 ```
 
-A LP abre em `/` e o Builder em `/#builder` (cada um carrega à parte). O modo construtor, de montar o mapa à mão, saiu do app em 09/10/2026: o código está na tag `backup-construtor` e a explicação no cofre, em `RoomiVault/projetos/Roomi Builder/Modo construtor.md`.
+A LP abre em `/` e o Maker em `/#builder` (cada um carrega à parte). O nome ao lado do logo é Maker; o repositório e a pasta continuam `roomi-builder`. O modo construtor, de montar o mapa à mão, saiu do app em 09/10/2026: o código está na tag `backup-construtor` e a explicação no cofre, em `RoomiVault/projetos/Roomi Builder/Modo construtor.md`.
 
 ## Stack
 
 | Peça | Por quê |
 |---|---|
-| Vite + React + TypeScript | dev server rápido, build simples, LP e Builder em pedaços separados |
+| Vite + React + TypeScript | dev server rápido, build simples, LP e Maker em pedaços separados |
 | three.js via @react-three/fiber | volume 3D de verdade |
 | anime.js v4 | coreografia da obra (anima `scale`/`position` dos objetos three.js) |
-| Motion (`motion/react`) | interface do Builder: painéis, contadores, troca de pergunta |
+| Motion (`motion/react`) | interface do Maker: painéis, contadores, troca de pergunta |
 | GSAP + ScrollTrigger | rolagem da LP (nunca na mesma tela que o Motion) |
 | Zustand | estado único compartilhado entre a cena e a UI |
 
@@ -40,7 +40,7 @@ A LP abre em `/` e o Builder em `/#builder` (cada um carrega à parte). O modo c
 - O mapa para de desenhar enquanto o relatório, a galeria ou a explicação o cobrem. Na LP, o 3D para quando as seções claras o cobrem.
 - A resolução do canvas é fixa: a da tela, até 2×. Baixá-la quando a obra pesa deixava o mapa borrado depois de escolher a categoria.
 - A LP abre com a planta estática do resort e carrega o 3D à parte. Sem WebGL, a planta fica.
-- Comparado à versão com construtor (tag `backup-construtor`), o Builder carrega 1.446 kB (415 kB em gzip) em vez de 1.591 kB (462 kB). Saíram o drei, o troika e as 59 fotos de catálogo tiradas na abertura.
+- Comparado à versão com construtor (tag `backup-construtor`), o Maker carrega 1.446 kB (415 kB em gzip) em vez de 1.591 kB (462 kB). Saíram o drei, o troika e as 59 fotos de catálogo tiradas na abertura.
 
 ## Design (RoomiVault › design)
 
@@ -66,13 +66,15 @@ No destino praia, o mar é um bloco de maquete encostado na divisa de água do m
 
 Segue as notas do cofre sobre rolagem e GSAP: a rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com `position: sticky` e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido.
 
-1. **Abertura**: título em três linhas, como a capa dos PDFs, e os elementos do resort caindo do céu, cada um sobre a sua placa do board (sem o board inteiro).
-2. **O negócio do exemplo** em quatro etapas: investimento, receita, operação e retorno, com os números do motor. A cada etapa, um grupo novo de elementos cai do céu enquanto o anterior segue caindo até sumir. A posição é função da rolagem, então voltar desfaz. O retorno desenha o caixa em 10 anos. "Pular para as perguntas" leva adiante.
+1. **Abertura**: "Simulador de resorts / Comece seu sonho / com a Roomi", no título em três linhas da capa dos PDFs, e os elementos do resort caindo do céu, cada um sobre a sua placa do board (sem o board inteiro).
+2. **Como funciona**, em quatro passos que levam às perguntas: defina seus critérios, confira as restrições, entenda os cálculos (com o caixa em 10 anos desenhado na rolagem) e organize seu relatório. Cada passo traz um exemplo do resort de exemplo.
+   - A cada passo, um grupo novo de oito ou nove elementos desce do céu enquanto o anterior segue descendo até sumir, sem quique e quase sem giro. A posição é função da rolagem (scrub com inércia), então voltar desfaz. Cada peça vira poucas malhas ao montar.
+   - Na última tela da seção, as perguntas sobem por cima, com o texto e os elementos parados.
 3. **Perguntas que visam o futuro**: as sete perguntas de negócio do questionário e o que cada uma muda.
-4. **O relatório**: as seis folhas A4 do exemplo, com a fachada fotografada pelo próprio 3D, saem da pilha e abrem em leque com a rolagem (no celular, uma fila para deslizar). Um clique numa folha abre o leitor nela.
+4. **O relatório**: as seis folhas A4 do exemplo, com a fachada fotografada pelo próprio 3D, saem da pilha e abrem em leque com a rolagem (no celular, uma fila para deslizar). O leque lê as medidas uma vez e só escreve transform, que a placa de vídeo compõe. Um clique numa folha abre o leitor nela.
 5. **Chamada final** no coral da contracapa, com o chapéu.
 
-Todos os números da LP saem do motor, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, cada etapa mostra o seu grupo já pousado e nada anima.
+Todos os números da LP saem do motor, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, cada passo mostra o seu grupo já pousado e nada anima.
 
 ## Cálculo (`src/lib/valuation.ts`)
 
@@ -89,8 +91,9 @@ Todos os números da LP saem do motor, para o primeiro modelo da galeria (all in
 - As escolhas são cartões com desenho próprio: praia, campo e serra; as seis categorias com a diária de referência; os públicos; e as faixas de orçamento.
 - O orçamento nunca é um valor exato: são faixas (até R$ 50 mi, 50 a 100, 100 a 200, 200 a 400 e acima de 400 mi). O relatório só diz se o investimento cabe na faixa, passa do teto ou fica abaixo dela.
 - Os números usam um controle próprio. Ele tem o valor grande, os botões − e +, uma régua e atalhos (por exemplo 60, 120, 200, 300 e 450 UHs).
+- Ao lado, aparece a faixa de investimento (a estimativa com 10% para cada lado, em degraus redondos, como "R$ 120 a 160 mi"), não o valor somado. O checklist também mostra a faixa; o valor exato fica no relatório.
 - Tarifa, ocupação e orçamento podem ficar de fora ("Usar a do mercado" ou "Sem orçamento"). As puladas ficam guardadas mesmo com o checklist aberto e fechado.
-- Cada resposta vira uma etiqueta acima da barra, e clicar nela volta à pergunta. Ao lado ficam o investimento e o EBITDA por mês, ao vivo.
+- Cada resposta vira uma etiqueta acima da barra, e clicar nela volta à pergunta. Ao lado ficam a faixa de investimento e o EBITDA por mês, ao vivo.
 - Destino, categoria, UHs e público mudam o que é construído. Nome, tarifa, ocupação e orçamento só mudam o relatório.
 - Cada mudança gera um programa de necessidades (`src/lib/program.ts`): chegada, lazer da categoria, extras do público, o que cresce com as UHs, hospedagem e, por fim, caminhos e paisagismo.
   - O lazer de cada categoria cumpre os requisitos dela.
@@ -117,7 +120,7 @@ Todos os números da LP saem do motor, para o primeiro modelo da galeria (all in
 São seis folhas A4 em retrato com os elementos dos PDFs da Roomi (RoomiVault › design › Molde de deck Roomi, levado ao retrato): só as três cores, Editorial New nos títulos e numerais, Futura New no corpo, título sobre régua de 2 px com o wordmark coral no canto, contador de página no pé, quadrado coral numerado, marca-texto coral no número da conclusão e planos com contorno e meio-tom. Margens de 16 mm nas laterais, 15 em cima e 14 embaixo. Na tela as folhas encolhem para caber; em "Imprimir / PDF" cada uma vira uma folha A4.
 
 1. **Capa** (escura):
-   - lockup ROOMI | Builder;
+   - lockup ROOMI | Maker;
    - "Simulação de negócio", o nome do projeto e a categoria em coral;
    - a fachada do hotel com o plano de retícula atrás;
    - investimento, TIR e payback no pé.
@@ -225,7 +228,7 @@ A imagem de cada modelo é fotografada do próprio layout 3D, de frente como o b
 ## Esboços
 
 - **Salvar esboço** baixa um arquivo `<nome-do-projeto>.roomi.json`. Ele traz o nome do projeto, a lista de itens (id do catálogo, célula e rotação), as respostas do questionário e as do checklist.
-- **Abrir** carrega esse arquivo e reconstrói o resort com a animação de obra. Arquivos salvos antes do nome Builder também abrem, e um orçamento salvo como valor vira a faixa em que ele cai.
+- **Abrir** carrega esse arquivo e reconstrói o resort com a animação de obra. Arquivos salvos com os nomes anteriores também abrem, e um orçamento salvo como valor vira a faixa em que ele cai.
 - Itens fora do catálogo, fora do terreno, sobrepostos ou malformados ficam de fora, e o aviso diz quantos.
 
 ## Caminhos, cercas e mobiliário

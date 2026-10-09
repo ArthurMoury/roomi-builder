@@ -57,6 +57,17 @@ export const BY_TIER: Record<TierId, { other: number; gop: number; staff: number
   lux: { other: 0.8, gop: 0.33, staff: 1.8 },
 }
 
+// Faixa de investimento para mostrar enquanto o projeto é respondido: a estimativa com 10% para
+// cada lado, arredondada em degraus redondos. O valor exato só aparece no relatório.
+export function investRange(v: number) {
+  if (!v) return null
+  const step = v < 2e6 ? 0.1e6 : v < 20e6 ? 1e6 : v < 100e6 ? 5e6 : v < 500e6 ? 10e6 : 50e6
+  const mi = (x: number) => (x / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: x < 2e6 ? 1 : 0 })
+  const lo = Math.max(step, Math.floor((v * 0.9) / step) * step)
+  const hi = Math.max(lo + step, Math.ceil((v * 1.1) / step) * step)
+  return `R$ ${mi(lo)} a ${mi(hi)} mi`
+}
+
 export const ASSUME = {
   baseFee: 0.04,        // taxa básica de administração, % da receita total (HVS: 4–5%)
   incentiveFee: 0.1,    // taxa de incentivo, % do GOP (HVS: 10–15%)

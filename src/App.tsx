@@ -108,8 +108,8 @@ export default function App({ onHome }: { onHome: () => void }) {
 
       <motion.header className="panel topbar" initial={{ y: -80, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 160, damping: 22, delay: 0.2 }}>
-        <button className="brand" onClick={onHome} aria-label="Roomi Builder, voltar à apresentação">
-          <span className="logo" aria-hidden="true" /><span>Builder</span>
+        <button className="brand" onClick={onHome} aria-label="Roomi Maker, voltar à apresentação">
+          <span className="logo" aria-hidden="true" /><span>Maker</span>
         </button>
         <span className={`project ${name ? '' : 'empty'}`}>{name || 'Novo projeto'}</span>
         <button className="btn icon" onClick={() => useStore.getState().setTheme(theme === 'dark' ? 'light' : 'dark')}

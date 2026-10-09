@@ -1,4 +1,4 @@
-/* LP do Builder. Peça expressiva da marca: escala Editorial e repetição, só nas três cores, sem
+/* LP do Maker. Peça expressiva da marca: escala Editorial e repetição, só nas três cores, sem
    sombra e sem degradê. A página rola no documento (o app trava o body). */
 :root[data-view="lp"], :root[data-view="lp"] body, :root[data-view="lp"] #root { height: auto; }
 :root[data-view="lp"] { overflow-x: clip; }
@@ -13,7 +13,7 @@
 .lp .lockup { display: flex; align-items: center; gap: 16px; color: inherit; text-decoration: none; }
 .lp .wm { display: inline-block; width: 107px; height: 21px; background: #F1E9E7; -webkit-mask: url('/roomi-wordmark.svg') no-repeat center / contain; mask: url('/roomi-wordmark.svg') no-repeat center / contain; }
 .lp .lockup i { width: 1px; height: 30px; background: rgba(241, 233, 231, .4); }
-.lp .lockup span:last-child { font-family: var(--font-display); font-size: 23px; }
+.lp .lockup span:last-child { align-self: flex-end; line-height: 1; font-family: var(--font-display); font-size: 23px; } /* na linha de base do wordmark */
 .lp .lockup.ink .wm { background: #1D1D1B; }
 .lp .lockup.ink i { background: rgba(29, 29, 27, .4); }
 
@@ -41,11 +41,12 @@
 .lp-hero-nums div { padding: 0 24px; border-left: 1px solid rgba(241, 233, 231, .25); }
 .lp-hero-nums div:first-child { padding-left: 0; border-left: 0; }
 .lp-hero-nums b { display: block; font-family: var(--font-display); font-weight: 200; font-size: clamp(36px, 4vw, 56px); line-height: 1; color: #F97B55; font-variant-numeric: tabular-nums; }
-.lp-hero-nums span, .lp-live span { display: block; margin-top: 8px; font: 700 10px var(--font-sans); letter-spacing: .22em; text-transform: uppercase; color: rgba(241, 233, 231, .66); }
+.lp-hero-nums span { display: block; margin-top: 8px; font: 700 10px var(--font-sans); letter-spacing: .22em; text-transform: uppercase; color: rgba(241, 233, 231, .66); }
 .lp-note { margin-top: 14px; font-size: 12px; color: rgba(241, 233, 231, .55); }
 
-/* O negócio: palco preso por sticky, uma etapa por tela */
-.lp-build { position: relative; z-index: 1; height: 460svh; }
+/* Como funciona: palco preso por sticky, um passo por tela. A última tela da seção é a cortina:
+   as perguntas sobem por cima do texto e dos elementos, que ficam parados */
+.lp-build { position: relative; z-index: 1; height: 560svh; }
 .lp-stick { position: sticky; top: 0; height: 100svh; display: grid; grid-template-columns: minmax(0, 45%) 1fr; padding: 64px var(--pad) 0; }
 .lp-beat { display: flex; flex-direction: column; justify-content: center; gap: 22px; max-width: 500px; }
 .lp-count { display: flex; align-items: center; gap: 16px; }
@@ -58,10 +59,7 @@
 .lp-beat .cap h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(40px, 4.6vw, 66px); line-height: 1; letter-spacing: -.015em; }
 .lp-lead { margin-top: 14px; font-family: var(--font-display); font-weight: 300; font-size: clamp(22px, 2vw, 28px); line-height: 1.25; color: rgba(241, 233, 231, .92); }
 .lp-lead b { font-weight: 400; color: #F97B55; }
-.lp-live { display: grid; grid-template-columns: repeat(3, minmax(0, auto)); justify-content: start; margin-top: 22px; border-top: 1px solid rgba(241, 233, 231, .16); padding-top: 18px; }
-.lp-live div { padding: 0 22px; border-left: 1px solid rgba(241, 233, 231, .16); min-width: 0; }
-.lp-live div:first-child { padding-left: 0; border-left: 0; }
-.lp-live b { display: block; font-family: var(--font-display); font-weight: 300; font-size: 32px; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lp-step-note { margin-top: 18px; padding-left: 12px; border-left: 3px solid #F97B55; font-size: 14px; line-height: 1.5; color: rgba(241, 233, 231, .72); }
 .lp-mini { display: block; width: 100%; max-width: 480px; height: auto; margin-top: 22px; overflow: visible; }
 .lp-mini .zero { stroke: rgba(241, 233, 231, .5); stroke-width: 1; }
 .lp-mini .bar { transform-box: fill-box; }
@@ -72,7 +70,7 @@
 .lp-skip:hover { color: #F1E9E7; }
 
 /* Seções que cobrem os elementos */
-.lp-questions { position: relative; z-index: 1; background: #F1E9E7; color: #1D1D1B; padding: clamp(72px, 10vw, 140px) var(--pad); }
+.lp-questions { position: relative; z-index: 2; margin-top: -100svh; background: #F1E9E7; color: #1D1D1B; padding: clamp(72px, 10vw, 140px) var(--pad); }
 .lp-report { position: relative; z-index: 1; background: #1D1D1B; padding: clamp(72px, 10vw, 140px) var(--pad); border-top: 1px solid rgba(241, 233, 231, .12); }
 .lp-h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(36px, 5vw, 72px); line-height: 1.03; letter-spacing: -.02em; max-width: 1000px; }
 .lp-report .hl { background: none; color: #F97B55; padding: 0; }
@@ -88,11 +86,11 @@
 
 /* Relatório: as seis folhas, em pilha que abre em leque com a rolagem; um clique abre o leitor */
 .sheets.lp-deck { margin-top: 56px; display: flex; flex-direction: row; align-items: flex-start; gap: 16px; overflow-x: auto; padding: 4px 4px 16px; scroll-snap-type: x mandatory; }
-.lp-deck .sheet-wrap { flex: none; scroll-snap-align: center; cursor: zoom-in; outline: 1px solid rgba(241, 233, 231, .28); transition: translate .22s cubic-bezier(.2, .7, .2, 1); }
+.lp-deck .sheet-wrap { flex: none; scroll-snap-align: center; cursor: zoom-in; outline: 1px solid rgba(241, 233, 231, .28); contain: layout style; transition: translate .22s cubic-bezier(.2, .7, .2, 1); }
 .lp-deck .sheet-wrap:hover { translate: 0 -10px; }
 .lp-deck .sheet { pointer-events: none; }
 .sheets.lp-deck.fan { position: relative; display: block; height: calc(1123px * var(--s) + 110px); overflow: visible; padding: 0; }
-.lp-deck.fan .sheet-wrap { position: absolute; top: 24px; left: calc(50% - 794px * var(--s) / 2); }
+.lp-deck.fan .sheet-wrap { position: absolute; top: 24px; left: calc(50% - 794px * var(--s) / 2); will-change: transform; }
 .lp-read { margin-top: 28px; }
 
 .lp-viewer { position: fixed; inset: 0; z-index: 50; background: rgba(29, 29, 27, .94); }
@@ -101,7 +99,7 @@
 
 /* Chamada final, no coral da contracapa */
 .lp-cta { position: relative; z-index: 1; min-height: 86svh; overflow: hidden; background: #F97B55; color: #1D1D1B; padding: clamp(80px, 12vw, 160px) var(--pad) 140px; }
-.lp-cta .lp-lede { color: rgba(29, 29, 27, .8); margin-bottom: 30px; }
+.lp-cta .lp-btn { margin-top: 36px; }
 .lp-chapeu { position: absolute; right: var(--pad); bottom: 80px; width: min(480px, 42vw); transform: rotate(-6deg); pointer-events: none; }
 .lp-cta .lockup { position: absolute; left: var(--pad); bottom: 48px; }
 .lp-foot { position: relative; z-index: 1; background: #1D1D1B; padding: 28px var(--pad) 36px; font-size: 12px; line-height: 1.5; color: rgba(241, 233, 231, .55); }
@@ -118,8 +116,6 @@
   .lp-nav .lockup i { height: 24px; }
   .lp-nav .lockup span:last-child { font-size: 19px; }
   .lp-nav .lp-btn { padding: 0 12px; font-size: 10.5px; letter-spacing: .06em; }
-  .lp-live b { font-size: 24px; }
-  .lp-live div { padding: 0 14px; }
   .lp-beat .cap h2 { font-size: 36px; }
   .lp-lead { font-size: 20px; }
   .lp-mini { max-width: 100%; }

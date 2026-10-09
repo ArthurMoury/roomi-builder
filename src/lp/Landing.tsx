@@ -1,7 +1,6 @@
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { ASSUME } from '../lib/business'
 import type { Inset } from '../three/view'
 import { PAGE_H, PAGE_W, ReportSheets } from '../ui/ReportSheets'
 import { Plan } from './Plan'
@@ -11,7 +10,7 @@ import './landing.css'
 
 gsap.registerPlugin(ScrollTrigger)
 
-// LP que antecede o Builder. Segue o cofre (design › Animação de rolagem e bibliotecas › GSAP): a
+// LP que antecede o Maker. Segue o cofre (design › Animação de rolagem e bibliotecas › GSAP): a
 // rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com position: sticky
 // e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. Os elementos do resort
 // caem do céu no 3D, que carrega à parte, com a planta estática no lugar enquanto isso (ou de vez,
@@ -21,39 +20,38 @@ const Showcase = lazy(() => import('./Showcase'))
 
 const num = (v: number, d = 0) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const mi = (v: number) => num(v / 1e6, Math.abs(v) >= 1e8 ? 0 : 1)
-const brl = (v: number) => `R$ ${mi(v)} mi`
 const pct = (v: number, d = 0) => `${num(v * 100, d)}%`
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
-// barras do caixa do retorno, crescendo uma depois da outra até k = 1
+// barras do caixa no passo dos cálculos, crescendo uma depois da outra até k = 1
 const drawCash = (k: number) => document.querySelectorAll<SVGRectElement>('.lp-mini .bar').forEach((el, i, all) => {
   el.style.transform = `scaleY(${clamp01(k * (all.length + 2) - i)})`
 })
 
-// As quatro etapas do negócio do exemplo; cada uma traz o seu grupo de elementos caindo do céu
-const BEATS: { title: string; lead: ReactNode; kpis: [string, string][]; chart?: boolean }[] = [
+// O fluxo em quatro passos, antes das perguntas; cada passo traz o seu grupo de elementos caindo do céu
+const BEATS: { title: string; lead: string; note: string; chart?: boolean }[] = [
   {
-    title: 'Investimento',
-    lead: <>Com <b>{brl(BIZ.investment)}</b>, um resort de {EV.keys} UHs sai do papel, sem contar o terreno.</>,
-    kpis: [[mi(BIZ.obra), 'R$ mi de obra'], [mi(BIZ.confirmed), 'R$ mi fora da obra'], [num(BIZ.perKey / 1e3), 'R$ mil por UH']],
+    title: 'Defina seus critérios',
+    lead: 'Destino, categoria, tamanho e público. Você diz o que o resort precisa ser e o programa sobe no terreno.',
+    note: `No exemplo: praia, all inclusive e ${EV.keys} UHs para famílias.`,
   },
   {
-    title: 'Receita',
-    lead: <><b>{brl(BIZ.revenueYear)}</b> de receita por ano, com a operação estabilizada.</>,
-    kpis: [[num(BIZ.adr), 'R$ de diária média'], [pct(BIZ.occ), 'de ocupação'], [num(BIZ.revpar), 'R$ de RevPAR']],
+    title: 'Confira as restrições',
+    lead: 'A faixa de orçamento e o checklist de escopo dizem o que cabe. Cada Sim ou Não constrói ou tira do mapa.',
+    note: 'Custos fora da obra só entram quando você confirma.',
   },
   {
-    title: 'Operação',
-    lead: <>EBITDA de <b>{brl(BIZ.ebitdaMonth)}</b> por mês, com margem de {pct(BIZ.ebitdaMargin)}.</>,
-    kpis: [[pct(BIZ.gopMargin), 'de margem GOP'], [mi(BIZ.ebitdaYear), 'R$ mi de EBITDA por ano'], [num(BIZ.jobs), 'empregos diretos']],
-  },
-  {
-    title: 'Retorno',
-    lead: <>TIR real de <b>{pct(BIZ.irr ?? 0, 1)}</b>, com a obra paga em {num(BIZ.payback ?? 0, 1)} anos.</>,
-    kpis: [[`${BIZ.npv < 0 ? '−' : '+'}${mi(Math.abs(BIZ.npv))}`, `R$ mi de VPL a ${pct(ASSUME.discount)}`], [pct(BIZ.breakEven ?? 1), 'ocupação de equilíbrio'], [mi(BIZ.value), 'R$ mi de valor do ativo']],
+    title: 'Entenda os cálculos',
+    lead: 'Obra, receita, GOP, EBITDA e retorno em 10 anos, com a fonte de cada número.',
+    note: `No exemplo: TIR real de ${pct(BIZ.irr ?? 0, 1)} e a obra paga em ${num(BIZ.payback ?? 0, 1)} anos.`,
     chart: true,
   },
+  {
+    title: 'Organize seu relatório',
+    lead: 'Seis folhas A4 no molde dos PDFs da Roomi, prontas para imprimir e levar à mesa de decisão.',
+    note: 'Capa, números, operação, caixa, risco e premissas.',
+  },
 ]
-const P_MAX = 4.6 // a rolagem das etapas vai de 0 (abertura) a 4,6; a etapa k pousa em p = k + 1
+const P_MAX = 4.6 // a rolagem dos passos vai de 0 (abertura) a 4,6; o passo k pousa em p = k + 1
 
 const QUESTIONS = [
   { q: 'Onde fica o hotel?', why: 'Praia, campo ou serra mudam o desenho do terreno e o lazer que vende.' },
@@ -124,13 +122,16 @@ export default function Landing({ onStart }: { onStart: () => void }) {
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      // a etapa do texto muda em degraus nítidos; o caixa do retorno se desenha com a rolagem
+      // os passos ocupam a seção menos a última tela, em que as perguntas sobem por cima de tudo parado
+      const build = root.current!.querySelector<HTMLElement>('.lp-build')!
+      const span = () => `+=${build.offsetHeight - innerHeight}`
+      // o passo do texto muda em degraus nítidos; o caixa dos cálculos se desenha com a rolagem
       ScrollTrigger.create({
-        trigger: '.lp-build', start: 'top bottom', end: 'bottom bottom',
+        trigger: build, start: 'top bottom', end: span, invalidateOnRefresh: true,
         onUpdate: (st) => {
           const p = st.progress * P_MAX
           setBeat(p < 0.5 ? -1 : Math.min(BEATS.length - 1, Math.floor(p - 0.5)))
-          cashK.current = still ? 1 : clamp01((p - 3.65) / 0.75)
+          cashK.current = still ? 1 : clamp01((p - 2.6) / 0.7)
           drawCash(cashK.current)
         },
       })
@@ -145,7 +146,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
         // os elementos caem do céu: a abertura no carregamento, o resto com a rolagem
         gsap.fromTo(fall, { intro: 0 }, { intro: 1, duration: 1.8, ease: 'none', delay: 0.15 })
         // scrub com inércia: os elementos seguem a rolagem com um leve atraso, sem tranco
-        gsap.fromTo(fall, { p: 0 }, { p: P_MAX, ease: 'none', scrollTrigger: { trigger: '.lp-build', start: 'top bottom', end: 'bottom bottom', scrub: 1.2 } })
+        gsap.fromTo(fall, { p: 0 }, { p: P_MAX, ease: 'none', scrollTrigger: { trigger: build, start: 'top bottom', end: span, scrub: 1.2, invalidateOnRefresh: true } })
         gsap.from('.lp-hero .rise', { y: 12, opacity: 0, duration: 0.42, stagger: 0.07, ease: 'power2.out', delay: 0.1 })
         // perguntas entram 12 px em 260 ms, uma depois da outra
         gsap.set('.lp-q', { opacity: 0, y: 12 })
@@ -155,23 +156,25 @@ export default function Landing({ onStart }: { onStart: () => void }) {
         })
         // as folhas do relatório saem da pilha e abrem em leque com a rolagem (no celular, uma fila)
         if (!desk) return
+        // leve: as medidas são lidas uma vez (e de novo só no refresh), a ordem das folhas é fixada
+        // uma vez e cada quadro só escreve transform, que a placa de vídeo compõe sem repintar
         const deck = document.querySelector<HTMLElement>('.lp-deck')!
         const sheets = gsap.utils.toArray<HTMLElement>('.lp-deck .sheet-wrap')
         deck.classList.add('fan')
+        sheets.forEach((el, i) => { el.style.zIndex = String(sheets.length - i) })
+        let spread = 0
+        const measure = () => { spread = Math.min(215, (deck.clientWidth - sheets[0].offsetWidth) / (sheets.length - 1)) }
         const k = { v: 0 }
-        const place = () => {
-          const sw = sheets[0].offsetWidth, spread = Math.min(215, (deck.clientWidth - sw) / (sheets.length - 1))
-          sheets.forEach((el, i) => {
-            const c = i - (sheets.length - 1) / 2
-            const x = gsap.utils.interpolate(c * 7, c * spread, k.v)
-            const y = gsap.utils.interpolate(Math.abs(c) * 3, c * c * 7, k.v)
-            const r = gsap.utils.interpolate(c * 1.5, c * 4, k.v)
-            el.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg)`
-            el.style.zIndex = String(sheets.length - i)
-          })
-        }
+        const place = () => sheets.forEach((el, i) => {
+          const c = i - (sheets.length - 1) / 2
+          const x = gsap.utils.interpolate(c * 7, c * spread, k.v)
+          const y = gsap.utils.interpolate(Math.abs(c) * 3, c * c * 7, k.v)
+          const r = gsap.utils.interpolate(c * 1.5, c * 4, k.v)
+          el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${r}deg)`
+        })
+        measure()
         place()
-        gsap.to(k, { v: 1, ease: 'none', onUpdate: place, scrollTrigger: { trigger: deck, start: 'top 85%', end: 'center 55%', scrub: 0.5, invalidateOnRefresh: true } })
+        gsap.to(k, { v: 1, ease: 'none', onUpdate: place, scrollTrigger: { trigger: deck, start: 'top 85%', end: 'center 55%', scrub: 0.5, onRefresh: () => { measure(); place() } } })
         return () => { deck.classList.remove('fan'); sheets.forEach((el) => { el.style.transform = ''; el.style.zIndex = '' }) }
       })
     }, root)
@@ -234,7 +237,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
       </div>
 
       <header className="lp-nav">
-        <a className="lockup" href="#" aria-label="Roomi Builder"><span className="wm" /><i /><span>Builder</span></a>
+        <a className="lockup" href="#" aria-label="Roomi Maker"><span className="wm" /><i /><span>Maker</span></a>
         <a className="lp-btn" href="#builder" onClick={start}>Começar meu projeto</a>
       </header>
 
@@ -242,24 +245,24 @@ export default function Landing({ onStart }: { onStart: () => void }) {
         <div className="col">
           <h1 className="lp-title">
             <span className="t1 rise">Simulador de resorts</span>
-            <span className="t2 rise">Do terreno ao retorno</span>
-            <span className="t3 rise">em 8 respostas</span>
+            <span className="t2 rise">Comece seu sonho</span>
+            <span className="t3 rise">com a Roomi</span>
           </h1>
           <p className="lp-desc rise">Responda oito perguntas e veja o resort se montar em 3D, num terreno de 4 hectares. O relatório sai em folhas A4, com investimento, operação e retorno em 10 anos.</p>
           <div className="lp-ctas rise">
             <a className="lp-btn" href="#builder" onClick={start}>Começar meu projeto</a>
-            <button className="lp-btn ghost" onClick={() => go('.lp-build')}>Ver os números</button>
+            <button className="lp-btn ghost" onClick={() => go('.lp-build')}>Ver como funciona</button>
           </div>
           <div className="lp-hero-nums rise">
             <div><b>{EV.keys}</b><span>UHs</span></div>
             <div><b>{mi(BIZ.investment)}</b><span>R$ mi de investimento</span></div>
             <div><b>{num((BIZ.irr ?? 0) * 100, 1)}</b><span>% de TIR real</span></div>
           </div>
-          <p className="lp-note rise">Exemplo: {MODEL.name.toLowerCase()}, montado pelo Builder.</p>
+          <p className="lp-note rise">Exemplo: {MODEL.name.toLowerCase()}, montado no Maker.</p>
         </div>
       </section>
 
-      <section className="lp-build" aria-label="O negócio do exemplo, etapa por etapa">
+      <section className="lp-build" aria-label="Como funciona, passo a passo">
         <div className="lp-stick">
           <div className="lp-beat">
             <div className="lp-count">
@@ -269,9 +272,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
             <div className="cap" ref={cap} key={current}>
               <h2>{b.title}</h2>
               <p className="lp-lead">{b.lead}</p>
-              <div className="lp-live">
-                {b.kpis.map(([v, l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}
-              </div>
+              <p className="lp-step-note">{b.note}</p>
               {b.chart && <MiniCash />}
             </div>
             <button className="lp-skip" onClick={() => go('.lp-questions')}>Pular para as perguntas</button>
@@ -294,17 +295,16 @@ export default function Landing({ onStart }: { onStart: () => void }) {
 
       <section className="lp-report">
         <h2 className="lp-h2">O estudo sai em <span className="hl">seis folhas A4</span>.</h2>
-        <p className="lp-lede">Este é o relatório do exemplo, gerado pelo Builder: a capa com a fachada, o hotel em números, a operação, o caixa em 10 anos, valor e risco, e as premissas. Clique numa folha para ler.</p>
+        <p className="lp-lede">Este é o relatório do exemplo, gerado pelo Maker: a capa com a fachada, o hotel em números, a operação, o caixa em 10 anos, valor e risco, e as premissas. Clique numa folha para ler.</p>
         <div className="sheets lp-deck" style={{ '--s': 0.38 } as CSSProperties} onClick={openSheet}>{report}</div>
         <button className="lp-btn ghost lp-read" onClick={() => setReading(0)}>Ler o relatório do exemplo</button>
       </section>
 
       <section className="lp-cta">
         <h2 className="lp-h2">Seu estudo fica pronto em 8 respostas.</h2>
-        <p className="lp-lede">Sem cadastro. O esboço fica salvo no seu computador e o relatório sai em PDF.</p>
         <a className="lp-btn ink" href="#builder" onClick={start}>Começar meu projeto</a>
         <img className="lp-chapeu" src="/roomi-chapeu.svg" alt="" />
-        <div className="lockup ink"><span className="wm" /><i /><span>Builder</span></div>
+        <div className="lockup ink"><span className="wm" /><i /><span>Maker</span></div>
       </section>
 
       <footer className="lp-foot">

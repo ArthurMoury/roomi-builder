@@ -171,7 +171,7 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
     <>
       {/* 1. capa */}
       <div className="sheet-wrap"><Sheet n={1} dark className="cover">
-        <div className="lockup"><span className="wm" /><i /><span>Builder</span></div>
+        <div className="lockup"><span className="wm" /><i /><span>Maker</span></div>
         <div className={`cover-title ${title.length > 18 ? 'long' : ''}`}>
           <span className="t1">Simulação de negócio</span>
           <span className="t2">{title}:</span>
@@ -344,9 +344,9 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
       {/* 6. contracapa */}
       <div className="sheet-wrap"><Sheet n={6} coral className="back">
         <h2 className="back-title">Do terreno ao retorno,<br />num estudo só.</h2>
-        <p className="back-sub">{title}, simulado no Builder da Roomi.</p>
+        <p className="back-sub">{title}, simulado no Maker da Roomi.</p>
         <img className="chapeu" src="/roomi-chapeu.svg" alt="" />
-        <div className="lockup ink"><span className="wm" /><i /><span>Builder</span></div>
+        <div className="lockup ink"><span className="wm" /><i /><span>Maker</span></div>
       </Sheet></div>
     </>
   )

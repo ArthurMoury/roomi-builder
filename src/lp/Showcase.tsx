@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ITEM_BY_ID } from '../data/catalog'
 import { C, mat } from '../three/materials'
 import { Model } from '../three/models'
 import { Edges } from '../three/parts'
+import { disposeMerged, mergeItem } from '../three/merge'
 import { DPR, Rig } from '../three/Scene'
 import { PhotoOf } from '../three/Thumbs'
 import { CameraRig, boardBounds, cam, resetView, view, type Inset } from '../three/view'
@@ -12,32 +13,48 @@ import { SHOW } from './example'
 import { fall } from './motion'
 
 // Os elementos do resort caindo do céu, sem o board: um grupo na abertura e um em cada etapa do
-// negócio. A rolagem (GSAP, em fall.p) faz o grupo da etapa descer e pousar enquanto o anterior
-// segue descendo até sumir; voltar a rolagem desfaz, porque a posição é função do progresso. A troca
-// é macia: as janelas de saída e de entrada só se encostam, sem quique e quase sem giro. Cada peça
-// vem sobre a sua placa do board, com o plano coral deslocado atrás.
+// fluxo. A rolagem (GSAP, em fall.p) faz o grupo da etapa descer e pousar enquanto o anterior segue
+// descendo até sumir; voltar a rolagem desfaz, porque a posição é função do progresso. A troca é
+// macia: as janelas de saída e de entrada só se encostam, sem quique e quase sem giro. Cada peça vem
+// sobre a sua placa do board, com o plano coral deslocado atrás, e vira poucas malhas ao montar.
 
 type Piece = { id: string; x: number; z: number }
 const GROUPS: Piece[][] = [
   // abertura: o resort em peças
-  [{ id: 'lobby', x: -4.5, z: -2.5 }, { id: 'pool', x: 3.5, z: -1 }, { id: 'villa', x: -4, z: 4 }, { id: 'palm', x: 1, z: 4.5 }, { id: 'palm', x: 7, z: 3 }],
-  // investimento: a obra pesa nos prédios de hospedagem
-  [{ id: 'std', x: -4, z: -2 }, { id: 'suite', x: 4, z: 1 }, { id: 'family', x: -3.5, z: 4.5 }],
-  // receita: a diária das UHs e o A&B
-  [{ id: 'villa', x: -5, z: -1 }, { id: 'bungalow', x: 0, z: -3 }, { id: 'alacarte', x: 4, z: 2 }],
-  // operação: os serviços que dão margem
-  [{ id: 'buffet', x: -3.5, z: -2 }, { id: 'spa', x: 4, z: 1.5 }, { id: 'kids', x: -4, z: 4.5 }],
-  // retorno: o lazer que vende o resort
-  [{ id: 'infinity', x: -2, z: -2 }, { id: 'swimup', x: 4.5, z: 1 }, { id: 'poolbar', x: -4.5, z: 3.5 }, { id: 'palm', x: 1, z: 4 }, { id: 'palm', x: 7, z: -2 }],
+  [
+    { id: 'lobby', x: -5, z: -3 }, { id: 'pool', x: 2.5, z: -3.5 }, { id: 'villa', x: -5.5, z: 3 }, { id: 'gazebo', x: -1, z: 2.5 },
+    { id: 'sunbeds', x: 1.5, z: 0.5 }, { id: 'sunbeds', x: 3.5, z: 0.5 }, { id: 'palm', x: 7, z: -3.5 }, { id: 'palm', x: 6, z: 2 }, { id: 'palm', x: 2, z: 4.5 },
+  ],
+  // critérios: o que o resort precisa ser (hospedagem para o público)
+  [
+    { id: 'std', x: -4.5, z: -3.5 }, { id: 'suite', x: 3.5, z: -3.5 }, { id: 'family', x: -5, z: 2.5 }, { id: 'chalet', x: -0.5, z: 2 },
+    { id: 'chalet', x: 3, z: 2 }, { id: 'chalet', x: 6.5, z: 2.5 }, { id: 'tree', x: -0.5, z: -1 }, { id: 'tree', x: 1, z: 5 }, { id: 'tree', x: -2, z: 5.5 },
+  ],
+  // restrições: o escopo, o lazer que entra ou sai
+  [
+    { id: 'tennis', x: -4, z: -3 }, { id: 'kids', x: 4.5, z: -3.5 }, { id: 'playground', x: 4.5, z: 2.5 }, { id: 'gym', x: -5.5, z: 2.5 },
+    { id: 'lounge', x: -1, z: 2.5 }, { id: 'palm', x: 8, z: -0.5 }, { id: 'palm', x: -3, z: 5.6 }, { id: 'tree', x: 1.5, z: 5.6 },
+  ],
+  // cálculos: a operação que gera receita e margem
+  [
+    { id: 'buffet', x: -4.5, z: -3 }, { id: 'spa', x: 4, z: -3 }, { id: 'alacarte', x: -5, z: 3 }, { id: 'poolbar', x: -0.5, z: 2.5 },
+    { id: 'kiosk', x: 3, z: 2 }, { id: 'fountain', x: 6, z: 3 }, { id: 'sunbeds', x: 2.5, z: 4.5 }, { id: 'sunbeds', x: 3.8, z: 4.5 },
+  ],
+  // relatório: o resort pronto, o que ele vende
+  [
+    { id: 'infinity', x: -4, z: -3.5 }, { id: 'swimup', x: 2.5, z: -3.5 }, { id: 'villa', x: -5.5, z: 2.5 }, { id: 'bungalow', x: -1.5, z: 2 },
+    { id: 'pergola', x: 2, z: 2 }, { id: 'villa', x: 6, z: 0 }, { id: 'palm', x: 7.5, z: -4 }, { id: 'palm', x: 1, z: 5 }, { id: 'palm', x: 5, z: 4.5 },
+  ],
 ]
 const LAST = GROUPS.length - 1
-const BOUNDS = { x0: -8.5, x1: 8.5, z0: -5.5, z1: 7 } // o que precisa caber no quadro
-const SKY = 16        // de quanto acima as peças descem
-const DEPTH = 16      // quanto as que saem descem até sumir
-const STAGGER = 0.12  // atraso entre as peças de um grupo, na janela da troca
+const BOUNDS = { x0: -8.2, x1: 9, z0: -5.6, z1: 6.6 } // o que precisa caber no quadro
+const SKY = 16    // de quanto acima as peças descem
+const DEPTH = 16  // quanto as que saem descem até sumir
 // janelas da troca, em unidades de p: o grupo g entra em [g − 0,6, g − 0,25] e sai em [g + 0,25, g + 0,6];
 // a saída de um e a entrada do próximo se encostam em p = g + 0,5, onde o texto da etapa muda
 const IN_FROM = 0.6, IN_TO = 0.25, OUT_FROM = 0.25, OUT_TO = 0.6
+// cascata dentro do grupo: as peças entram espalhadas em 45% da janela e saem em 30%
+const IN_SPREAD = 0.45, OUT_SPREAD = 0.3
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10) // sai e chega devagar
@@ -49,16 +66,25 @@ const plateFaces = [mat.slab, mat.slab, plateTop, mat.slab, mat.slab, mat.slab]
 
 function PieceView({ piece, g, j, n }: { piece: Piece; g: number; j: number; n: number }) {
   const ref = useRef<THREE.Group>(null!)
+  const model = useRef<THREE.Group>(null!)
+  const [merged, setMerged] = useState<THREE.Group | null>(null)
   const it = ITEM_BY_ID[piece.id]
   const plate = useMemo(() => new THREE.BoxGeometry(it.w + 0.8, 0.45, it.d + 0.8), [it])
   useEffect(() => () => plate.dispose(), [plate])
+  // as dezenas de peças do modelo viram poucas malhas, uma por material
+  useLayoutEffect(() => {
+    const m = mergeItem(model.current)
+    setMerged(m)
+    return () => { disposeMerged(m); setMerged(null) }
+  }, [])
   const spin = j % 2 ? 1 : -1
+  const lag = n > 1 ? j / (n - 1) : 0
   useFrame(() => {
     // entrada: o grupo da abertura desce no carregamento; os outros, com a rolagem
     const into = g === 0 ? fall.intro : clamp01((fall.p - (g - IN_FROM)) / (IN_FROM - IN_TO))
     const away = g === LAST ? 0 : clamp01((fall.p - (g + OUT_FROM)) / (OUT_TO - OUT_FROM))
-    const u = clamp01((into - j * STAGGER) / (1 - (n - 1) * STAGGER))
-    const v = clamp01((away - j * STAGGER * 0.6) / (1 - (n - 1) * STAGGER * 0.6))
+    const u = clamp01((into - lag * IN_SPREAD) / (1 - IN_SPREAD))
+    const v = clamp01((away - lag * OUT_SPREAD) / (1 - OUT_SPREAD))
     const o = ref.current
     o.visible = u > 0 && v < 1
     if (!o.visible) return
@@ -75,7 +101,7 @@ function PieceView({ piece, g, j, n }: { piece: Piece; g: number; j: number; n: 
       <mesh geometry={plate} material={plateBack} position={[0.35, -0.6, 0.35]}>
         <Edges color={C.ink} />
       </mesh>
-      <Model id={piece.id} w={it.w} d={it.d} />
+      <group ref={model}>{merged ? <primitive object={merged} /> : <Model id={piece.id} w={it.w} d={it.d} />}</group>
     </group>
   )
 }

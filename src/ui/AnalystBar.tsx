@@ -6,7 +6,7 @@ import { BUDGETS, LAYOUT_FIELDS, MAX_UHS, type Spec } from '../lib/spec'
 import { rebuild } from '../lib/program'
 import type { Business } from '../lib/business'
 import { view } from '../three/view'
-import { Counter } from './Counter'
+import { Counter, InvestRange } from './Counter'
 import { InfoIcon } from './icons'
 
 // Questionário que monta o hotel no mapa enquanto é respondido. Uma pergunta por vez; cada
@@ -302,7 +302,7 @@ export function AnalystBar({ ev, biz }: { ev: Evaluation; biz: Business }) {
         </div>
 
         <div className="q-side">
-          <div className="out"><span className="lb">Investimento</span><b><Counter value={biz.investment} format={(v) => (v ? money(v) : '—')} /></b></div>
+          <div className="out"><span className="lb">Faixa de investimento</span><b><InvestRange value={biz.investment} /></b></div>
           <div className="out"><span className="lb">EBITDA por mês</span><b><Counter value={biz.ebitdaMonth} format={(v) => (v ? money(v) : '—')} /></b></div>
           <div className="q-actions">
             <button className="icon-btn" onClick={() => open('explain')} aria-label="Como calculamos" title="Como calculamos"><InfoIcon /></button>

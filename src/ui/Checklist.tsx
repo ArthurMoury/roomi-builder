@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { money } from '../lib/valuation'
 import { answerScope } from '../lib/program'
 import type { Business } from '../lib/business'
-import { Counter } from './Counter'
+import { InvestRange } from './Counter'
 
 const pct = (v: number) => `${Math.round(v * 100)}%`
 const spring = { type: 'spring', stiffness: 500, damping: 34 } as const
@@ -66,8 +66,8 @@ export function Checklist({ biz, onClose }: { biz: Business; onClose: () => void
 
       <footer className="ck-foot">
         <div className="ck-total">
-          <span className="lb">Investimento</span>
-          <b><Counter value={biz.investment} format={money} /></b>
+          <span className="lb">Faixa de investimento</span>
+          <b><InvestRange value={biz.investment} /></b>
           <small>{biz.pending ? `${money(biz.pending)} ainda a confirmar` : 'tudo confirmado'}</small>
         </div>
         <div className="ck-actions">
