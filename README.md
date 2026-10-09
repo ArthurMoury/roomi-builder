@@ -66,7 +66,10 @@ No destino praia, o mar é um bloco de maquete encostado na divisa de água do m
 
 Segue as notas do cofre sobre rolagem e GSAP: a rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com `position: sticky` e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido.
 
-1. **Abertura**: "Simulador de resorts / Comece seu sonho / com a Roomi", no título em três linhas da capa dos PDFs, e os elementos do resort caindo do céu, cada um sobre a sua placa do board (sem o board inteiro).
+1. **Abertura**: "Simulador de resorts / Comece seu sonho / com a Roomi", no título em três linhas da capa dos PDFs, e o livro da Roomi em 3D (RoomiVault › design › Formas geométricas da marca, "Livro que gira sozinho").
+   - São 12 folhas presas na lombada, numa onda contínua de folheio, e o livro gira sozinho, uma volta a cada 20 s, visto um pouco de cima. Cada folha tem frente e verso: creme, escuro, coral ou meio-tom de ponto creme, com contorno creme a 55%, como no tema escuro do molde.
+   - Ao carregar, as folhas saem fechadas e abrem em leque, uma depois da outra.
+   - No desktop, com a rolagem, o livro desce até sumir enquanto os elementos do primeiro passo caem. No celular ele fica acima do texto e sobe com a página, um pouco mais rápido que ela, para nunca passar por trás das letras.
 2. **Como funciona**, em quatro passos que levam às perguntas: defina seus critérios, confira as restrições, entenda os cálculos (com o caixa em 10 anos desenhado na rolagem) e organize seu relatório. Cada passo traz um exemplo do resort de exemplo.
    - A cada passo, um grupo novo de oito ou nove elementos desce do céu enquanto o anterior segue descendo até sumir, sem quique e quase sem giro. A posição é função da rolagem (scrub com inércia), então voltar desfaz. Cada peça vira poucas malhas ao montar.
    - Na última tela da seção, as perguntas sobem por cima, com o texto e os elementos parados.
@@ -74,7 +77,7 @@ Segue as notas do cofre sobre rolagem e GSAP: a rolagem é de quem lê, cada pas
 4. **O relatório**: as seis folhas A4 do exemplo, com a fachada fotografada pelo próprio 3D, saem da pilha e abrem em leque com a rolagem (no celular, uma fila para deslizar). O leque lê as medidas uma vez e só escreve transform, que a placa de vídeo compõe. Um clique numa folha abre o leitor nela.
 5. **Chamada final** no coral da contracapa, com o chapéu.
 
-Todos os números da LP saem do motor, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, cada passo mostra o seu grupo já pousado e nada anima.
+Todos os números da LP saem do motor, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, o livro aparece aberto e parado, cada passo mostra o seu grupo já pousado e nada anima.
 
 ## Cálculo (`src/lib/valuation.ts`)
 
@@ -124,11 +127,21 @@ São seis folhas A4 em retrato com os elementos dos PDFs da Roomi (RoomiVault �
    - "Simulação de negócio", o nome do projeto e a categoria em coral;
    - a fachada do hotel com o plano de retícula atrás;
    - investimento, TIR e payback no pé.
-2. **O hotel em números**: a conclusão numa frase, investimento, TIR real em 10 anos, payback e EBITDA por mês em numerais grandes, onde vai o investimento e as notas (faixa de orçamento, categoria pedida, premissas).
+2. **O hotel em números**: a conclusão numa frase, investimento, TIR real em 10 anos, payback e EBITDA por mês em numerais grandes, onde vai o investimento e as notas (faixa de orçamento, categoria pedida, premissas). A lista de onde vai o investimento mostra seis áreas e cede uma linha para cada nota extra, para as notas e as siglas caberem na folha.
 3. **A operação estabilizada** (diária, ocupação, RevPAR, TRevPAR, receita, GOP, EBITDA, empregos e de onde vem a receita) e **Quando o investimento volta** (caixa acumulado em 10 anos com o payback, EBITDA e ocupação de cada ano).
 4. **Valor e risco** (yield on cost, valor do ativo, custo por UH, ocupação de equilíbrio e sensibilidade da TIR) e **A diária entre as categorias**.
 5. **Escopo e premissas**: o que o checklist confirmou, a conta do investimento, as premissas e as fontes.
 6. **Contracapa** (coral): o chapéu da Roomi e o lockup.
+
+Cada sigla é explicada uma vez, numa faixa "Siglas" no pé da folha em que ela aparece pela primeira vez, depois do trecho em que aparece. A faixa traz a sigla por extenso e uma frase curta:
+
+- capa: UH e TIR;
+- folha 2: VPL e EBITDA;
+- folha 3: RevPAR, TRevPAR, GOP e A&B;
+- folha 4: p.p.;
+- folha 5: FF&E, JLL, HVS, IPTU e as fontes (FOHB, ABIH-SP, CUB, Sinduscon-SP e SINAPI).
+
+Termos em inglês que não são siglas (payback, cap rate, yield on cost) ficam de fora. O relatório do Maker e o da LP usam as mesmas folhas, então os dois mostram a faixa.
 
 A imagem do hotel não é a tela. O mapa atual é montado numa cena à parte, sem animação e sem a câmera de quem está usando, e fotografado de frente, pela chegada (`FrontPhoto` em `src/three/Thumbs.tsx`).
 

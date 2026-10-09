@@ -12,9 +12,10 @@ gsap.registerPlugin(ScrollTrigger)
 
 // LP que antecede o Maker. Segue o cofre (design › Animação de rolagem e bibliotecas › GSAP): a
 // rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com position: sticky
-// e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. Os elementos do resort
-// caem do céu no 3D, que carrega à parte, com a planta estática no lugar enquanto isso (ou de vez,
-// sem WebGL). Todos os números saem do motor, para o resort de exemplo.
+// e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. Na abertura, o livro da
+// Roomi gira e folheia no 3D; nos passos, os elementos do resort caem do céu. O 3D carrega à parte, com
+// a planta estática nos passos enquanto isso (ou de vez, sem WebGL). Todos os números saem do motor,
+// para o resort de exemplo.
 
 const Showcase = lazy(() => import('./Showcase'))
 
@@ -142,10 +143,8 @@ export default function Landing({ onStart }: { onStart: () => void }) {
       const mm = gsap.matchMedia()
       mm.add({ motion: '(prefers-reduced-motion: no-preference)', desk: '(min-width: 960px)' }, (c) => {
         const { motion, desk } = c.conditions as { motion: boolean; desk: boolean }
-        if (!motion) { fall.intro = 1; return }
-        // os elementos caem do céu: a abertura no carregamento, o resto com a rolagem
-        gsap.fromTo(fall, { intro: 0 }, { intro: 1, duration: 1.8, ease: 'none', delay: 0.15 })
-        // scrub com inércia: os elementos seguem a rolagem com um leve atraso, sem tranco
+        if (!motion) return
+        // o livro sai e os elementos caem do céu com a rolagem, num scrub com inércia: um leve atraso, sem tranco
         gsap.fromTo(fall, { p: 0 }, { p: P_MAX, ease: 'none', scrollTrigger: { trigger: build, start: 'top bottom', end: span, scrub: 1.2, invalidateOnRefresh: true } })
         gsap.from('.lp-hero .rise', { y: 12, opacity: 0, duration: 0.42, stagger: 0.07, ease: 'power2.out', delay: 0.1 })
         // perguntas entram 12 px em 260 ms, uma depois da outra
@@ -230,7 +229,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
     <div className="lp" ref={root}>
       <div className="lp-canvas" aria-hidden="true">
         {webgl ? (
-          <Suspense fallback={plan}>
+          <Suspense fallback={beat < 0 ? null : plan}>
             <Showcase beat={beat} inset={inset} paused={paused} still={still} wantPhoto={wantPhoto} onPhoto={onPhoto} />
           </Suspense>
         ) : plan}

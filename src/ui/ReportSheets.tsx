@@ -23,6 +23,38 @@ const signed = (v: number) => `${v > 0 ? '+' : '−'} ${money(Math.abs(v))}`
 const mi = (v: number) => num(Math.abs(v) / 1e6, Math.abs(v) >= 1e8 ? 0 : 1)
 const pad = (n: number) => String(n).padStart(2, '0')
 
+// Siglas: cada uma é explicada uma vez, numa faixa no pé da folha em que aparece pela primeira vez
+// (depois do trecho em que ela aparece). As folhas listam as suas na ordem de leitura.
+const SIGLAS: Record<string, string> = {
+  UH: 'Unidade habitacional. O quarto, a suíte ou o chalé vendido por diária.',
+  TIR: 'Taxa interna de retorno. Quanto o investimento rende por ano, já com a venda do hotel. Real, sem inflação.',
+  VPL: 'Valor presente líquido. O caixa futuro trazido para hoje pela taxa de desconto, menos o investimento.',
+  EBITDA: 'Lucro antes de juros, impostos, depreciação e amortização. O caixa que a operação gera.',
+  RevPAR: 'Revenue per available room. A receita de hospedagem por UH disponível, por dia.',
+  TRevPAR: 'Total revenue per available room. A receita total por UH disponível, por dia.',
+  GOP: 'Gross operating profit. O lucro bruto da operação, antes da administração e dos encargos fixos.',
+  'A&B': 'Alimentos e bebidas. Restaurantes, bares e serviço de quarto.',
+  'p.p.': 'Pontos percentuais. A distância entre duas porcentagens.',
+  'FF&E': 'Furniture, fixtures and equipment. Móveis, enxoval e equipamentos do hotel.',
+  JLL: 'Jones Lang LaSalle, consultoria imobiliária que publica o Hotelaria em Números.',
+  HVS: 'Consultoria internacional de hotelaria, referência em avaliação de hotéis.',
+  IPTU: 'Imposto predial e territorial urbano, cobrado pela prefeitura.',
+  FOHB: 'Fórum de Operadores Hoteleiros do Brasil.',
+  'ABIH-SP': 'Associação Brasileira da Indústria de Hotéis de São Paulo.',
+  CUB: 'Custo unitário básico da construção por metro quadrado, divulgado pelo Sinduscon de cada estado.',
+  'Sinduscon-SP': 'Sindicato da Indústria da Construção Civil do Estado de São Paulo.',
+  SINAPI: 'Sistema Nacional de Pesquisa de Custos e Índices da Construção Civil, da Caixa e do IBGE.',
+}
+
+function Siglas({ ids }: { ids: string[] }) {
+  return (
+    <aside className="siglas" aria-label="Siglas desta folha">
+      <span className="lb">Siglas</span>
+      <dl>{ids.map((id) => <div key={id}><dt>{id}</dt><dd>{SIGLAS[id]}</dd></div>)}</dl>
+    </aside>
+  )
+}
+
 // Retícula: pontos coral crescendo para a direita, linhas alternadas deslocadas meia célula
 function Reticula({ w, h, passo = 12, rmax = 5.1, curva = 1.6, className }: { w: number; h: number; passo?: number; rmax?: number; curva?: number; className?: string }) {
   const dots: ReactNode[] = []
@@ -153,19 +185,20 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
     ['Implantação', spec.destino ? TEMPLATES[templateOf(spec)].name : '—'],
   ]
 
-  // onde vai o investimento: obra por área do catálogo, mais o que foi confirmado fora da obra
-  const spend = [
-    ...CATS.map((c) => ({ label: c.label, v: ev.byCat.get(c.id) ?? 0 })),
-    { label: 'Fora da obra', v: biz.confirmed },
-  ].filter((r) => r.v > 0).sort((a, b) => b.v - a.v).slice(0, 6)
-  const spendMax = Math.max(1, ...spend.map((r) => r.v))
-
   // a faixa de orçamento só se compara com o investimento; o relatório nunca crava um valor
   const b = biz.budget
   const budget = !b ? null
     : biz.investment > b.max ? { bad: true, text: `O investimento passa ${money(biz.investment - b.max)} do teto da faixa de orçamento (${b.label}).` }
       : biz.investment < b.min ? { bad: false, text: `O investimento fica abaixo da faixa de orçamento (${b.label}). Há espaço para subir o padrão.` }
         : { bad: false, text: `O investimento cabe na faixa de orçamento (${b.label}).` }
+
+  // onde vai o investimento: obra por área do catálogo, mais o que foi confirmado fora da obra. A lista
+  // cede uma linha para cada nota extra no pé, para as notas e as siglas nunca saírem da folha.
+  const spend = [
+    ...CATS.map((c) => ({ label: c.label, v: ev.byCat.get(c.id) ?? 0 })),
+    { label: 'Fora da obra', v: biz.confirmed },
+  ].filter((r) => r.v > 0).sort((a, b) => b.v - a.v).slice(0, 6 - (budget ? 1 : 0) - (missing.length ? 1 : 0))
+  const spendMax = Math.max(1, ...spend.map((r) => r.v))
 
   return (
     <>
@@ -189,6 +222,7 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
           <div><b>{biz.irr != null ? num(biz.irr * 100, 1) : '—'}</b><span>% de TIR real</span></div>
           <div><b>{biz.payback != null ? num(biz.payback, 1) : '—'}</b><span>anos de payback</span></div>
         </div>
+        <Siglas ids={['UH', 'TIR']} />
       </Sheet></div>
 
       {/* 2. o hotel em números */}
@@ -232,6 +266,7 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
           {missing.length > 0 && <p className="bad">O mapa fica em {ev.tier?.name ?? 'nenhuma categoria'}. Para {wanted!.name} falta: {missing.join(', ')}.</p>}
           <p>Valores reais, sem inflação, sem terreno e sem financiamento. Custos fora da obra entram só quando confirmados no checklist.</p>
         </div>
+        <Siglas ids={['VPL', 'EBITDA']} />
       </Sheet></div>
 
       {/* 3. operação e caixa */}
@@ -263,6 +298,7 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
           </table>
           <div className="notes"><p>Além do caixa da operação, a venda no ano 10 pelo cap rate de {pct(ASSUME.capRate)} soma {money(biz.exit)} e entra na TIR.</p></div>
         </Sec>
+        <Siglas ids={['RevPAR', 'TRevPAR', 'GOP', 'A&B']} />
       </Sheet></div>
 
       {/* 4. valor, risco e categorias */}
@@ -307,6 +343,7 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
             </div>
           </div>
         </Sec>
+        <Siglas ids={['p.p.']} />
       </Sheet></div>
 
       {/* 5. escopo e premissas */}
@@ -339,6 +376,7 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
           <li>VPL a {pct(ASSUME.discount)} ao ano real. Custos operacionais {pct(ASSUME.fixedShare)} fixos.</li>
         </ul>
         <p className="small sources">Fontes: Panorama da Hotelaria Brasileira 2026 (HotelInvest e FOHB), JLL Hotelaria em Números, HVS, ABIH-SP, Resorts Brasil, CUB Sinduscon-SP e SINAPI. Simulação para comparar cenários, não um estudo de viabilidade.</p>
+        <Siglas ids={['FF&E', 'JLL', 'HVS', 'IPTU', 'FOHB', 'ABIH-SP', 'CUB', 'Sinduscon-SP', 'SINAPI']} />
       </Sheet></div>
 
       {/* 6. contracapa */}

@@ -270,6 +270,19 @@ input { font: inherit; color: inherit; }
 .sheet .notes p { padding-left: 12px; border-left: 3px solid #F97B55; font-size: 11.5px; color: var(--tinta2); line-height: 1.4; }
 .sheet .notes p.bad { color: #1D1D1B; font-weight: 500; }
 .sheet .small { font-size: 10.5px; color: var(--mudo); margin-top: 10px; line-height: 1.45; }
+/* faixa das siglas: depois do conteúdo, no pé da folha em que cada sigla aparece primeiro */
+.siglas { flex: none; display: flex; gap: 22px; margin-top: auto; padding-top: 9px; border-top: 1px solid #1D1D1B; }
+.sheet > .notes + .siglas, .sheet > p.sources + .siglas { margin-top: 14px; }
+.siglas .lb { flex: none; width: 52px; margin: 2px 0 0; }
+.siglas dl { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 22px; }
+.siglas dl div { font-size: 10px; line-height: 1.42; color: var(--tinta2); }
+.siglas dt { display: inline; font-weight: 700; color: #1D1D1B; margin-right: 5px; }
+.siglas dd { display: inline; margin: 0; }
+.sheet.dark .siglas { border-top-color: rgba(241, 233, 231, .25); }
+.sheet.dark .siglas dl div { color: rgba(241, 233, 231, .72); }
+.sheet.dark .siglas dt { color: #F1E9E7; }
+.cover .siglas { position: absolute; left: 60px; bottom: 26px; width: 340px; } /* termina antes dos pontos da retícula */
+.cover .siglas dl { grid-template-columns: 1fr; }
 .lockup { display: flex; align-items: center; gap: 16px; }
 .lockup .wm { width: 107px; height: 21px; background: #F1E9E7; }
 .lockup i { width: 1px; height: 30px; background: rgba(241, 233, 231, .4); }
@@ -284,7 +297,7 @@ input { font: inherit; color: inherit; }
 .cover-desc { margin-top: 22px; font-size: 13.5px; line-height: 1.5; color: rgba(241, 233, 231, .8); max-width: 520px; }
 .cover-shot { margin-top: 52px; width: 674px; height: 354px; flex: none; }
 .cover-ret { position: absolute; right: 0; bottom: 0; z-index: -1; }
-.cover-nums { position: absolute; left: 60px; bottom: 56px; display: flex; }
+.cover-nums { position: absolute; left: 60px; bottom: 128px; display: flex; } /* acima da faixa das siglas */
 .cover-nums div { padding: 0 24px; border-left: 1px solid rgba(241, 233, 231, .25); }
 .cover-nums div:first-child { padding-left: 0; border-left: 0; }
 .cover-nums b { display: block; font-family: var(--font-display); font-weight: 200; font-size: 50px; line-height: 1; color: #F97B55; font-variant-numeric: tabular-nums; }
