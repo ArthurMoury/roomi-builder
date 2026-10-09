@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Scene } from './three/Scene'
-import { Catalog } from './ui/Catalog'
-import { Summary } from './ui/Summary'
-import { Report } from './ui/Report'
 import { AnalystBar } from './ui/AnalystBar'
 import { BusinessReport } from './ui/BusinessReport'
 import { CalcExplainer } from './ui/CalcExplainer'
 import { Models } from './ui/Models'
 import { Checklist } from './ui/Checklist'
-import { useStore, type AppMode, type Tool } from './store'
+import { useStore } from './store'
 import { evaluate } from './lib/valuation'
 import { business } from './lib/business'
 import { downloadSketch, parseSketch } from './lib/sketch'
+import { resetView, view } from './three/view'
 
 const SunIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
@@ -26,41 +24,38 @@ const MoonIcon = () => (
   </svg>
 )
 
-const APP_MODES: { id: AppMode; label: string }[] = [
-  { id: 'analyst', label: 'Analista' },
-  { id: 'builder', label: 'Construtor' },
-]
-
-const MODES: { id: 'build' | 'select' | 'demolish'; label: string; tool: Tool }[] = [
-  { id: 'build', label: 'Construir', tool: { type: 'build' } },
-  { id: 'select', label: 'Selecionar', tool: { type: 'select' } },
-  { id: 'demolish', label: 'Demolir', tool: { type: 'demolish' } },
-]
-
-export default function App() {
+// O app: o board 3D ao fundo, o questionário embaixo e o checklist ao lado do mapa, antes do relatório
+export default function App({ onHome }: { onHome: () => void }) {
   const placed = useStore((s) => s.placed)
   const dying = useStore((s) => s.dying)
-  const tool = useStore((s) => s.tool)
   const name = useStore((s) => s.hotelName)
   const theme = useStore((s) => s.theme)
-  const placeMode = useStore((s) => s.placeMode)
-  const appMode = useStore((s) => s.appMode)
   const notice = useStore((s) => s.notice)
   const modal = useStore((s) => s.modal)
   const explain = useStore((s) => s.explain)
-  const live = useMemo(() => placed.filter((p) => !dying.has(p.uid)), [placed, dying])
-  const ev = useMemo(() => evaluate(live), [live])
   const spec = useStore((s) => s.spec)
   const checks = useStore((s) => s.checks)
+  const live = useMemo(() => placed.filter((p) => !dying.has(p.uid)), [placed, dying])
+  const ev = useMemo(() => evaluate(live), [live])
   const biz = useMemo(() => business(ev, live, spec, checks), [ev, live, spec, checks])
   const [toast, setToast] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
-  const mode = tool.type === 'place' ? 'build' : tool.type
-  const analyst = appMode === 'analyst'
+  const checklist = modal?.type === 'checklist'
   const notify = (text: string) => useStore.getState().notify(text)
   const closeModal = () => useStore.getState().closeModal()
 
   useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
+
+  // o board abre reto e de frente; a primeira vez, ensina o giro
+  useEffect(() => {
+    resetView({ top: 88, right: 16, bottom: 230, left: 16 })
+    notify('Clique numa das laterais do board para girá-lo 90°')
+  }, [])
+  // com o checklist aberto, o board recua para a esquerda e desce até o pé da tela
+  useEffect(() => {
+    view.inset.right = checklist ? 462 : 16
+    if (checklist) view.inset.bottom = 16
+  }, [checklist])
 
   // Comemora quando o hotel sobe de categoria
   const lastTier = useRef(-1)
@@ -83,21 +78,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const s = useStore.getState()
-      // Ctrl+B alterna entre analista e construtor, até com o foco num campo
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
-        e.preventDefault()
-        s.setAppMode(s.appMode === 'analyst' ? 'builder' : 'analyst')
-        return
-      }
-      if (e.key === 'Escape' && (s.modal || s.explain)) { s.closeModal(); return }
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'SELECT' || s.appMode !== 'builder') return
-      if ((e.key === 'r' || e.key === 'R') && !s.rotate()) s.notify('Não há espaço para girar este item aqui')
-      if (e.key === 'Escape') {
-        if (s.tool.type === 'place') s.setTool({ type: 'build' })
-        else s.select(null)
-      }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && s.selected) s.demolish(s.selected)
+      if (e.key === 'Escape' && (s.modal || s.explain)) s.closeModal()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -127,31 +108,10 @@ export default function App() {
 
       <motion.header className="panel topbar" initial={{ y: -80, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 160, damping: 22, delay: 0.2 }}>
-        <div className="brand"><span className="logo" role="img" aria-label="Roomi" /><span>Resort Builder</span></div>
-        <input className="name-input" value={name} onChange={(e) => useStore.getState().setName(e.target.value)} aria-label="Nome do hotel" />
-        <div className="segmented" role="radiogroup" aria-label="Modo de uso" title="Ctrl+B alterna">
-          {APP_MODES.map((m) => (
-            <button key={m.id} role="radio" aria-checked={appMode === m.id} className={`seg ${appMode === m.id ? 'on' : ''}`}
-              onClick={() => useStore.getState().setAppMode(m.id)}>
-              {appMode === m.id && <motion.span layoutId="mode-pill" className="seg-pill" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
-              <span>{m.label}</span>
-            </button>
-          ))}
-        </div>
-        <AnimatePresence initial={false}>
-          {!analyst && (
-            <motion.div key="place-mode" className="segmented" role="radiogroup" aria-label="Modo de posicionamento" title="Como o catálogo constrói"
-              initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} style={{ overflow: 'hidden' }}>
-              {(['manual', 'auto'] as const).map((m) => (
-                <button key={m} role="radio" aria-checked={placeMode === m} className={`seg ${placeMode === m ? 'on' : ''}`}
-                  onClick={() => useStore.getState().setPlaceMode(m)}>
-                  {placeMode === m && <motion.span layoutId="seg-pill" className="seg-pill" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
-                  <span>{m === 'manual' ? 'Manual' : 'Automático'}</span>
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <button className="brand" onClick={onHome} aria-label="Roomi Builder, voltar à apresentação">
+          <span className="logo" aria-hidden="true" /><span>Builder</span>
+        </button>
+        <span className={`project ${name ? '' : 'empty'}`}>{name || 'Novo projeto'}</span>
         <button className="btn icon" onClick={() => useStore.getState().setTheme(theme === 'dark' ? 'light' : 'dark')}
           aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'} title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}>
           <AnimatePresence mode="wait" initial={false}>
@@ -166,14 +126,11 @@ export default function App() {
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={(e) => open(e.target.files?.[0])} />
         <button className="btn" onClick={() => useStore.getState().openModal('models')}>Modelos</button>
         <button className="btn" onClick={() => useStore.getState().clear()}>Limpar</button>
-        {/* no analista, o relatório começa pelo checklist de escopo */}
-        <button className="btn primary" onClick={() => useStore.getState().openModal(analyst ? 'checklist' : 'report')} disabled={!live.length}>Ver relatório</button>
+        {/* o relatório começa pelo checklist de escopo */}
+        <button className="btn primary" onClick={() => useStore.getState().openModal('checklist')} disabled={!live.length}>Ver relatório</button>
       </motion.header>
 
-      <Catalog />
-      <Summary ev={ev} biz={biz} count={live.length} />
-
-      <div className={`dock ${analyst ? 'raised' : ''}`}>
+      <div className="dock">
         <AnimatePresence mode="popLayout">
           {notice ? (
             <motion.div key={notice.id} className="notice" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
@@ -182,24 +139,11 @@ export default function App() {
             </motion.div>
           ) : null}
         </AnimatePresence>
-        <AnimatePresence>
-          {!analyst && (
-            <motion.nav key="toolbar" className="toolbar" initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 160, damping: 22 }}>
-              {MODES.map((m) => (
-                <button key={m.id} className={`tool ${mode === m.id ? 'on' : ''}`} onClick={() => useStore.getState().setTool(m.tool)}>
-                  {mode === m.id && <motion.span layoutId="tool-pill" className="tool-pill" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
-                  <span>{m.label}</span>
-                </button>
-              ))}
-            </motion.nav>
-          )}
-        </AnimatePresence>
       </div>
 
       <AnimatePresence>
-        {analyst && modal?.type !== 'checklist' && <AnalystBar key="analyst" ev={ev} biz={biz} />}
-        {analyst && modal?.type === 'checklist' && <Checklist key="checklist" biz={biz} onClose={closeModal} />}
+        {!checklist && <AnalystBar key="analyst" ev={ev} biz={biz} />}
+        {checklist && <Checklist key="checklist" biz={biz} onClose={closeModal} />}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -214,9 +158,7 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {modal?.type === 'report' && (analyst
-          ? <BusinessReport key="biz" ev={ev} biz={biz} onClose={closeModal} />
-          : <Report key="report" ev={ev} biz={biz} placed={live} name={name} onClose={closeModal} />)}
+        {modal?.type === 'report' && <BusinessReport key="biz" ev={ev} biz={biz} onClose={closeModal} />}
         {modal?.type === 'models' && <Models key="models" onClose={closeModal} />}
       </AnimatePresence>
       <AnimatePresence>

@@ -25,7 +25,6 @@ export interface Item {
   tags: Tag[]
   est?: boolean
   decor?: boolean    // infraestrutura e paisagismo: não conta como amenidade na diária
-  paint?: boolean    // pode ser "pintado" arrastando no terreno
   link?: boolean     // peça de 5 m que se liga às vizinhas iguais (caminhos, cercas)
 }
 
@@ -100,23 +99,23 @@ export const ITEMS: Item[] = [
   { id: 'garden', name: 'Jardim paisagístico', cat: 'natureza', w: 6, d: 6, cost: 135_000, area: 900, tags: ['nature'], est: true },
   { id: 'lake', name: 'Lago ornamental', cat: 'natureza', w: 8, d: 6, cost: 144_000, area: 1200, tags: ['nature'], est: true },
   { id: 'veg', name: 'Horta orgânica', cat: 'natureza', w: 4, d: 3, cost: 30_000, area: 300, tags: ['nature'], est: true },
-  { id: 'palm', name: 'Palmeira', cat: 'natureza', w: 1, d: 1, cost: 4_000, area: 25, tags: [], est: true, decor: true, paint: true },
-  { id: 'tree', name: 'Árvore', cat: 'natureza', w: 1, d: 1, cost: 1_500, area: 25, tags: [], est: true, decor: true, paint: true },
-  { id: 'flowerbed', name: 'Canteiro de flores', cat: 'natureza', w: 1, d: 1, cost: 1_200, area: 6, tags: [], est: true, decor: true, paint: true },
+  { id: 'palm', name: 'Palmeira', cat: 'natureza', w: 1, d: 1, cost: 4_000, area: 25, tags: [], est: true, decor: true },
+  { id: 'tree', name: 'Árvore', cat: 'natureza', w: 1, d: 1, cost: 1_500, area: 25, tags: [], est: true, decor: true },
+  { id: 'flowerbed', name: 'Canteiro de flores', cat: 'natureza', w: 1, d: 1, cost: 1_200, area: 6, tags: [], est: true, decor: true },
 
   // Caminhos e cercas: trechos de 5 m que se ligam aos vizinhos iguais. Custos por trecho (estimativas):
   // pedra natural ~R$ 300/m², intertravado ~R$ 150/m², asfalto ~R$ 180/m², deck ~R$ 450/m², cerca ~R$ 180/m.
-  { id: 'path_stone', name: 'Caminho de pedra', cat: 'caminhos', w: 1, d: 1, cost: 2_250, area: 7.5, tags: [], est: true, decor: true, paint: true, link: true },
-  { id: 'path_paved', name: 'Calçada intertravada', cat: 'caminhos', w: 1, d: 1, cost: 1_500, area: 10, tags: [], est: true, decor: true, paint: true, link: true },
-  { id: 'road', name: 'Via interna (asfalto)', cat: 'caminhos', w: 1, d: 1, cost: 4_500, area: 25, tags: [], est: true, decor: true, paint: true, link: true },
-  { id: 'deck', name: 'Deck de madeira', cat: 'caminhos', w: 1, d: 1, cost: 11_250, area: 25, tags: [], est: true, decor: true, paint: true },
-  { id: 'fence', name: 'Cerca de madeira', cat: 'caminhos', w: 1, d: 1, cost: 900, area: 5, tags: [], est: true, decor: true, paint: true, link: true },
-  { id: 'hedge', name: 'Cerca viva', cat: 'caminhos', w: 1, d: 1, cost: 600, area: 5, tags: [], est: true, decor: true, paint: true, link: true },
-  { id: 'wall', name: 'Muro', cat: 'caminhos', w: 1, d: 1, cost: 3_000, area: 5, tags: [], est: true, decor: true, paint: true, link: true },
+  { id: 'path_stone', name: 'Caminho de pedra', cat: 'caminhos', w: 1, d: 1, cost: 2_250, area: 7.5, tags: [], est: true, decor: true, link: true },
+  { id: 'path_paved', name: 'Calçada intertravada', cat: 'caminhos', w: 1, d: 1, cost: 1_500, area: 10, tags: [], est: true, decor: true, link: true },
+  { id: 'road', name: 'Via interna (asfalto)', cat: 'caminhos', w: 1, d: 1, cost: 4_500, area: 25, tags: [], est: true, decor: true, link: true },
+  { id: 'deck', name: 'Deck de madeira', cat: 'caminhos', w: 1, d: 1, cost: 11_250, area: 25, tags: [], est: true, decor: true },
+  { id: 'fence', name: 'Cerca de madeira', cat: 'caminhos', w: 1, d: 1, cost: 900, area: 5, tags: [], est: true, decor: true, link: true },
+  { id: 'hedge', name: 'Cerca viva', cat: 'caminhos', w: 1, d: 1, cost: 600, area: 5, tags: [], est: true, decor: true, link: true },
+  { id: 'wall', name: 'Muro', cat: 'caminhos', w: 1, d: 1, cost: 3_000, area: 5, tags: [], est: true, decor: true, link: true },
 
   // Mobiliário externo (estimativas de mercado, instalado)
   { id: 'lamp', name: 'Poste de iluminação', cat: 'mobiliario', w: 1, d: 1, cost: 3_500, area: 1, tags: [], est: true, decor: true },
-  { id: 'bollard', name: 'Balizador de jardim', cat: 'mobiliario', w: 1, d: 1, cost: 800, area: 1, tags: [], est: true, decor: true, paint: true },
+  { id: 'bollard', name: 'Balizador de jardim', cat: 'mobiliario', w: 1, d: 1, cost: 800, area: 1, tags: [], est: true, decor: true },
   { id: 'bench', name: 'Banco de jardim', cat: 'mobiliario', w: 1, d: 1, cost: 1_500, area: 2, tags: [], est: true, decor: true },
   { id: 'sunbeds', name: 'Espreguiçadeiras com ombrelone', cat: 'mobiliario', w: 1, d: 1, cost: 4_000, area: 6, tags: [], est: true, decor: true },
   { id: 'firepit', name: 'Fogueira (fire pit)', cat: 'mobiliario', w: 2, d: 2, cost: 8_000, area: 60, tags: [], est: true, decor: true },

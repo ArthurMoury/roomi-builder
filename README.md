@@ -1,47 +1,77 @@
-# Roomi Resort Builder
+# Roomi Builder
 
-Construtor gamificado de hotéis e resorts em 3D. Você monta o mapa e recebe o valor de construção, a categoria de mercado e a diária estimada.
-
-Há dois modos, alternados com **Ctrl+B** ou pelo seletor da barra superior:
-
-- **Analista** (padrão): campos de negócio numa barra inferior montam o hotel sozinho. No fim, um relatório só com a visão de negócios.
-- **Construtor**: catálogo, resumo e ferramentas para montar e ajustar o mapa à mão.
+Simulador de resorts em 3D para a visão de negócios. Uma LP apresenta o produto; no Builder, um questionário monta o hotel sozinho num terreno de 4 hectares, um checklist confirma o escopo e o relatório sai em folhas A4 com investimento, operação e retorno em 10 anos.
 
 ```bash
 npm install
 npm run dev
 ```
 
+A LP abre em `/` e o Builder em `/#builder` (cada um carrega à parte). O modo construtor, de montar o mapa à mão, saiu do app em 09/10/2026: o código está na tag `backup-construtor` e a explicação no cofre, em `RoomiVault/projetos/Roomi Builder/Modo construtor.md`.
+
 ## Stack
 
 | Peça | Por quê |
 |---|---|
-| Vite + React + TypeScript | dev server rápido, build simples |
-| three.js via @react-three/fiber + drei | volume 3D de verdade |
+| Vite + React + TypeScript | dev server rápido, build simples, LP e Builder em pedaços separados |
+| three.js via @react-three/fiber | volume 3D de verdade |
 | anime.js v4 | coreografia da obra (anima `scale`/`position` dos objetos three.js) |
-| Motion (`motion/react`) | interface: painéis, contadores, troca de categoria, relatório |
+| Motion (`motion/react`) | interface do Builder: painéis, contadores, troca de pergunta |
+| GSAP + ScrollTrigger | rolagem da LP (nunca na mesma tela que o Motion) |
 | Zustand | estado único compartilhado entre a cena e a UI |
 
 ## Escala
 
 - Uma célula do mapa mede 5 × 5 m, e o terreno tem 40 × 40 células (200 × 200 m, cerca de 4 ha).
 - Os modelos são desenhados em metros (`src/three/models.tsx`), com pegadas e alturas reais. Exemplos: o edifício de 48 quartos tem 30 × 15 m e cerca de 17 m de altura (térreo + 4 andares); a piscina adulto tem lâmina de 18 × 7,5 m; a quadra de tênis segue a medida oficial de 23,77 × 10,97 m.
-- As miniaturas do catálogo são fotografadas dos próprios modelos 3D (`src/three/Thumbs.tsx`).
+
+## Câmera
+
+- O board abre reto e de frente, com a chegada (sul) embaixo (`src/three/view.ts`).
+- Um clique numa das laterais gira o board 90°: a lateral clicada vem para a frente. Passar o mouse sobre ela mostra o realce e a seta do giro.
+- A roda do mouse aproxima ou afasta. Não há órbita livre nem arrasto com o botão direito.
+- O enquadramento cabe o board na área que a interface deixa livre: acima do questionário (que muda de altura) e, com o checklist aberto, à esquerda dele.
 
 ## Desempenho
 
 - As peças usam geometrias unitárias compartilhadas.
 - Quando a obra de um item termina, as peças dele viram poucas malhas, uma por material (`src/three/merge.ts`).
-- O canvas reduz a resolução sozinho se o FPS cair (`PerformanceMonitor`).
+- Nenhum item roda código por quadro, e o ponteiro só testa o terreno, não as centenas de peças.
+- O mapa para de desenhar enquanto o relatório, a galeria ou a explicação o cobrem. Na LP, o 3D para quando as seções claras o cobrem.
+- O canvas reduz a resolução sozinho se o FPS cair e recupera quando sobra folga.
+- A LP abre com a planta estática do resort e carrega o 3D à parte. Sem WebGL, a planta fica.
+- Comparado à versão com construtor (tag `backup-construtor`), o Builder carrega 1.445 kB (414 kB em gzip) em vez de 1.591 kB (462 kB). Saíram o drei, o troika e as 59 fotos de catálogo tiradas na abertura.
 
 ## Design (RoomiVault › design)
 
 - Só as três cores: `#1D1D1B`, `#F97B55`, `#F1E9E7`. Fontes Editorial New (títulos e números) e Futura New (UI).
 - Planos chapados (toon em 3 degraus), contorno fino de 1px e meio-tom em espaço de tela como textura (água, grama, areia, asfalto, laje).
 - Plano atrás de plano: a laje coral deslocada sob a ilha.
-- Vidro só nos painéis, com camada de barreira (fundo 84% opaco), que é o uso aprovado para a Roomi.
-- Temas escuro e claro. No claro, o coral fica só em preenchimentos e bordas, porque texto coral sobre creme reprova em contraste.
+- Os campos de preencher (questionário, etiquetas e checklist) são sempre o inverso do fundo: no tema claro, grafite sobre o bege; no escuro, bege sobre o grafite.
+- Temas escuro e claro (o claro é o padrão). No claro, o coral fica só em preenchimentos e bordas, porque texto coral sobre creme reprova em contraste.
 - Logo: o wordmark oficial (`public/roomi-wordmark.svg`, copiado de `RoomiVault/deck/marca`), aplicado por máscara CSS para seguir a cor do tema.
+
+## O mar
+
+No destino praia, o mar fica na divisa de água do modelo de implantação (`src/three/Sea.tsx`). Tudo é desenhado num só shader:
+
+- uma faixa de areia em pontos miúdos junto ao terreno;
+- a espuma que lambe a areia e a linha da arrebentação, indo e voltando;
+- o mar em retícula, com os pontos coral crescendo para o fundo e ondas correndo para a areia;
+- as pontas e o horizonte somem aos poucos.
+
+## LP (`src/lp`)
+
+Segue as notas do cofre sobre rolagem e GSAP: a rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com `position: sticky` e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido.
+
+1. **Abertura**: título em três linhas, como a capa dos PDFs, e o terreno em 3D ao lado.
+2. **A obra**: o resort de exemplo sobe em quatro etapas (chegada, hospedagem, lazer e paisagismo), com UHs, obra e categoria ao vivo. Na última etapa o board gira 90°. "Pular a obra" leva adiante.
+3. **Como funciona**: questionário, checklist e relatório A4, em cartões com o plano de meio-tom atrás.
+4. **O exemplo em números**: investimento, TIR, EBITDA por mês e ocupação de equilíbrio, e o caixa acumulado que se desenha com a rolagem.
+5. **Três desenhos de implantação**: as zonas de cada modelo em planta, com os resorts reais de referência.
+6. **Chamada final** no coral da contracapa, com o chapéu.
+
+Todos os números da LP saem do motor, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, a obra aparece pronta e nada anima.
 
 ## Cálculo (`src/lib/valuation.ts`)
 
@@ -49,21 +79,23 @@ npm run dev
 - **Categoria**: o nível mais alto cujos requisitos foram cumpridos (Econômico → Midscale → Upscale → Resort → Resort All Inclusive, com Luxo como trilha própria).
 - **Diária**: ADR da categoria × mix de UHs (amortecido por raiz) × bônus de amenidades (até +12%).
 - **ADR e ocupação de referência**: Panorama da Hotelaria Brasileira 2026 (HotelInvest/FOHB), Anuário BLTA 2026 e Resorts Brasil/JLL. A ADR de resort e de all inclusive é estimativa.
-- **Retorno**: anos até o EBITDA cobrir o investimento, com rampa de ocupação (ver o modelo de negócios abaixo, `src/lib/business.ts`). No modo analista, a tarifa e a ocupação esperadas substituem as de referência quando preenchidas.
+- **Retorno**: anos até o EBITDA cobrir o investimento, com rampa de ocupação (ver o modelo de negócios abaixo, `src/lib/business.ts`). A tarifa e a ocupação esperadas do questionário substituem as de referência quando preenchidas.
 
-## Modo analista
+## Questionário
 
-- Um questionário na barra inferior monta o hotel enquanto é respondido. As perguntas aparecem uma por vez: destino, categoria, UHs, público, tarifa média esperada, ocupação esperada e orçamento.
-- As escolhas são cartões com desenho próprio: praia, campo e serra; as seis categorias com a diária de referência; e os públicos.
+- Um questionário na barra inferior monta o hotel enquanto é respondido. As perguntas aparecem uma por vez: nome do projeto, destino, categoria, UHs, público, tarifa média esperada, ocupação esperada e faixa de orçamento.
+- O nome vai na capa do relatório e no arquivo salvo.
+- As escolhas são cartões com desenho próprio: praia, campo e serra; as seis categorias com a diária de referência; os públicos; e as faixas de orçamento.
+- O orçamento nunca é um valor exato: são faixas (até R$ 50 mi, 50 a 100, 100 a 200, 200 a 400 e acima de 400 mi). O relatório só diz se o investimento cabe na faixa, passa do teto ou fica abaixo dela.
 - Os números usam um controle próprio. Ele tem o valor grande, os botões − e +, uma régua e atalhos (por exemplo 60, 120, 200, 300 e 450 UHs).
-- Tarifa, ocupação e orçamento podem ficar na referência de mercado ("Usar a do mercado" ou "Sem orçamento").
+- Tarifa, ocupação e orçamento podem ficar de fora ("Usar a do mercado" ou "Sem orçamento"). As puladas ficam guardadas mesmo com o checklist aberto e fechado.
 - Cada resposta vira uma etiqueta acima da barra, e clicar nela volta à pergunta. Ao lado ficam o investimento e o EBITDA por mês, ao vivo.
-- Destino, categoria, UHs e público mudam o que é construído. Tarifa, ocupação e orçamento só mudam as contas.
+- Destino, categoria, UHs e público mudam o que é construído. Nome, tarifa, ocupação e orçamento só mudam o relatório.
 - Cada mudança gera um programa de necessidades (`src/lib/program.ts`): chegada, lazer da categoria, extras do público, o que cresce com as UHs, hospedagem e, por fim, caminhos e paisagismo.
   - O lazer de cada categoria cumpre os requisitos dela.
   - O mix de UHs depende da categoria e do público.
   - Piscinas, restaurantes, quadras e vagas crescem com as UHs.
-- O programa é implantado pelo mesmo motor do posicionamento automático. O mapa vai até o layout novo sem refazer o que não mudou: o que ficou no lugar fica, o que saiu é demolido e o que entrou sobe em cascata.
+- O programa é implantado pelo motor de posicionamento automático. O mapa vai até o layout novo sem refazer o que não mudou: o que ficou no lugar fica, o que saiu é demolido e o que entrou sobe em cascata.
 - A hospedagem é implantada depois do lazer. Assim, mudar só as UHs acrescenta ou tira prédios sem mexer no resto.
 - O destino praia usa o modelo de implantação "Frente de mar" e mostra o mar ao norte; na categoria Luxo, a praia vira "Vila de bangalôs". Campo e serra usam o "Núcleo central".
 - Se a hospedagem não couber no terreno, um aviso diz quantas UHs couberam.
@@ -79,29 +111,22 @@ npm run dev
 - **Custos fora da obra**: só entram quando confirmados. São estimativas: FF&E 12%, projetos e licenças 6%, pré-operacional 3% e contingência 5% da obra.
 - O investimento acompanha cada resposta. "Gerar relatório" leva à etapa 2.
 
-### Etapa 2: relatório de negócios
+### Etapa 2: relatório de negócios em A4
 
-O relatório segue o molde de deck da Roomi (RoomiVault › design). Ele tem páginas 16:9, só as três cores, Editorial New nos títulos e numerais e Futura New no corpo. Na tela as páginas encolhem para caber; em "Imprimir / PDF" cada página vira uma folha de 13,333 × 7,5 polegadas.
+São seis folhas A4 em retrato com os elementos dos PDFs da Roomi (RoomiVault › design › Molde de deck Roomi, levado ao retrato): só as três cores, Editorial New nos títulos e numerais, Futura New no corpo, título sobre régua de 2 px com o wordmark coral no canto, contador de página no pé, quadrado coral numerado, marca-texto coral no número da conclusão e planos com contorno e meio-tom. Margens de 16 mm nas laterais, 15 em cima e 14 embaixo. Na tela as folhas encolhem para caber; em "Imprimir / PDF" cada uma vira uma folha A4.
 
 1. **Capa** (escura):
-   - lockup ROOMI | Resort Builder;
-   - "Simulação de negócio", o nome do hotel e a categoria em coral;
-   - investimento, TIR e payback no pé;
-   - a fachada do hotel com o plano de retícula atrás.
-2. **O hotel em números**: investimento, TIR real em 10 anos, payback e EBITDA por mês em numerais grandes, mais onde vai o investimento (custo por área).
-3. **A operação estabilizada**: diária, ocupação, RevPAR, TRevPAR, receita, GOP, EBITDA e empregos diretos, mais de onde vem a receita.
-4. **Quando o investimento volta**: o caixa acumulado em 10 anos, com o ponto de payback e o EBITDA e a ocupação de cada ano.
-5. **Valor e risco**:
-   - yield on cost contra o cap rate;
-   - valor do ativo pronto;
-   - custo por UH contra o da categoria;
-   - ocupação de equilíbrio;
-   - sensibilidade da TIR à diária e à ocupação.
-6. **A diária entre as categorias**: o mesmo hotel em cada categoria.
-7. **Escopo e premissas**: o que o checklist confirmou, a conta do investimento e as premissas com as fontes.
-8. **Contracapa** (coral): o chapéu da Roomi e o lockup.
+   - lockup ROOMI | Builder;
+   - "Simulação de negócio", o nome do projeto e a categoria em coral;
+   - a fachada do hotel com o plano de retícula atrás;
+   - investimento, TIR e payback no pé.
+2. **O hotel em números**: a conclusão numa frase, investimento, TIR real em 10 anos, payback e EBITDA por mês em numerais grandes, onde vai o investimento e as notas (faixa de orçamento, categoria pedida, premissas).
+3. **A operação estabilizada** (diária, ocupação, RevPAR, TRevPAR, receita, GOP, EBITDA, empregos e de onde vem a receita) e **Quando o investimento volta** (caixa acumulado em 10 anos com o payback, EBITDA e ocupação de cada ano).
+4. **Valor e risco** (yield on cost, valor do ativo, custo por UH, ocupação de equilíbrio e sensibilidade da TIR) e **A diária entre as categorias**.
+5. **Escopo e premissas**: o que o checklist confirmou, a conta do investimento, as premissas e as fontes.
+6. **Contracapa** (coral): o chapéu da Roomi e o lockup.
 
-A imagem do hotel não é a tela. O mapa atual é montado numa cena à parte, sem animação, sem moldura de seleção e sem a câmera de quem está usando, e fotografado de frente, pela chegada (`FrontPhoto` em `src/three/Thumbs.tsx`). O relatório do modo construtor usa a mesma foto.
+A imagem do hotel não é a tela. O mapa atual é montado numa cena à parte, sem animação e sem a câmera de quem está usando, e fotografado de frente, pela chegada (`FrontPhoto` em `src/three/Thumbs.tsx`).
 
 ### Modelo de negócios (`src/lib/business.ts`)
 
@@ -122,11 +147,10 @@ A imagem do hotel não é a tela. O mapa atual é montado numa cena à parte, se
 
 ### Como calculamos
 
-O botão "Como calculamos" (no resumo, na barra do analista e no relatório) explica cada passo com os números do hotel atual: custo de obra, categoria, diária e ocupação, receitas, GOP e EBITDA, investimento, retorno e valor, ocupação de equilíbrio e sensibilidade.
+O botão "Como calculamos" (na barra do questionário, no checklist e no relatório) explica cada passo com os números do hotel atual: custo de obra, categoria, diária e ocupação, receitas, GOP e EBITDA, investimento, retorno e valor, ocupação de equilíbrio e sensibilidade.
 
-## Posicionamento automático (modo construtor)
+## Posicionamento automático (`src/lib/autoplace.ts`)
 
-- No seletor Manual/Automático, o automático faz cada clique no catálogo construir o item direto no lugar que mais faz sentido (`src/lib/autoplace.ts`).
 - O terreno é dividido em papéis: chegada, lazer, hospedagem, luxo e spa, esportes e diversão. Cada modelo de implantação posiciona esses papéis de um jeito:
   - **Núcleo central**: piscina e restaurantes no meio, blocos de quartos em ferradura voltados para eles, quadras junto à entrada e ao estacionamento, luxo num lado reservado.
   - **Frente de mar**: o mar fica ao norte. A recepção fica no lado de terra, os quartos em fileiras de frente para o mar e o lazer numa faixa junto à areia. Quadras no interior do terreno, villas e spa numa ponta silenciosa.
@@ -137,8 +161,6 @@ O botão "Como calculamos" (no resumo, na barra do analista e no relatório) exp
   - de quem fica perto e de quem fica longe, como ruído e privacidade;
   - se encosta numa divisa;
   - quanta folga deixa para caminho.
-
-  O aviso mostra a leitura usada.
 - O ponto de partida de cada construção é a célula logo à frente da fachada principal. Quando o ponto de partida de um item novo fica a 3–7 blocos do de outro, ou de um caminho existente, o caminho é construído.
 - Alguns itens têm leitura própria:
   - os caminhos ligam todos os acessos;
@@ -147,7 +169,6 @@ O botão "Como calculamos" (no resumo, na barra do analista e no relatório) exp
   - o muro protege a ala de luxo e o deck contorna a piscina;
   - postes, balizadores e bancos acompanham os caminhos;
   - árvores, palmeiras e canteiros ficam junto aos caminhos e prédios.
-- No automático, as zonas do modelo aparecem tracejadas no chão.
 
 ## Referências de implantação
 
@@ -191,24 +212,19 @@ O botão **Modelos** abre uma galeria de resorts prontos para abrir e mexer:
 - hotel de eventos;
 - o exemplo desenhado à mão.
 
-A imagem de cada modelo é fotografada do próprio layout 3D. Os modelos paramétricos preenchem os campos do analista e são gerados pelo mesmo programa (`src/data/models.ts`).
+A imagem de cada modelo é fotografada do próprio layout 3D, de frente como o board abre. Os modelos paramétricos preenchem o questionário e são gerados pelo mesmo programa (`src/data/models.ts`).
 
 ## Controles
 
-- `Ctrl+B` alterna entre os modos analista e construtor. `Esc` fecha a janela aberta.
-- Câmera: arraste o terreno para girar, use o botão direito para mover e a roda para dar zoom.
-- Construir: escolha um item no catálogo e clique no terreno. `Esc` cancela.
-  - `R` gira o item 90° por vez, passando pelos quatro lados. A prévia no ponteiro é o próprio modelo, coral se o lugar estiver livre e preto se estiver ocupado.
-  - Caminhos, cercas, árvores, canteiros e balizadores podem ser desenhados: segure e arraste pelo terreno.
-- Selecionar: clique num item para selecioná-lo e arraste para movê-lo. A moldura fica coral se o lugar estiver livre e preta se estiver ocupado; num lugar ocupado o item volta para onde estava. `R` gira o item selecionado no próprio lugar; se ele não couber girado, nada muda e aparece um aviso. `Del` demole o item selecionado.
-- Demolir: clique num item para demolir, ou segure e arraste para demolir tudo que o ponteiro tocar.
-- As barras laterais fecham pela seta do cabeçalho e reabrem pela aba que fica na borda.
+- Clique numa lateral do board para girá-lo 90°; a roda do mouse aproxima ou afasta.
+- `Esc` fecha a janela aberta.
+- O logo na barra superior volta à LP.
 - O tema padrão é o claro. O botão de sol/lua alterna, e a escolha fica salva no navegador.
 
 ## Esboços
 
-- **Salvar esboço** baixa um arquivo `<nome-do-hotel>.roomi.json`. Ele traz o nome do hotel, a lista de itens (id do catálogo, célula e rotação), os campos do analista e as respostas do checklist.
-- **Abrir** carrega esse arquivo e reconstrói o resort com a animação de obra.
+- **Salvar esboço** baixa um arquivo `<nome-do-projeto>.roomi.json`. Ele traz o nome do projeto, a lista de itens (id do catálogo, célula e rotação), as respostas do questionário e as do checklist.
+- **Abrir** carrega esse arquivo e reconstrói o resort com a animação de obra. Arquivos salvos antes do nome Builder também abrem, e um orçamento salvo como valor vira a faixa em que ele cai.
 - Itens fora do catálogo, fora do terreno, sobrepostos ou malformados ficam de fora, e o aviso diz quantos.
 
 ## Caminhos, cercas e mobiliário

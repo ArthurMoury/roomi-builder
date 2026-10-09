@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore } from '../store'
 import { TIERS, money, type Evaluation } from '../lib/valuation'
-import { LAYOUT_FIELDS, MAX_UHS, type Spec } from '../lib/spec'
+import { BUDGETS, LAYOUT_FIELDS, MAX_UHS, type Spec } from '../lib/spec'
 import { rebuild } from '../lib/program'
 import type { Business } from '../lib/business'
-import { Counter } from './Summary'
+import { view } from '../three/view'
+import { Counter } from './Counter'
 import { InfoIcon } from './icons'
 
-// Modo analista: um questionário que monta o hotel no mapa enquanto é respondido. Uma pergunta
-// por vez; cada resposta vira uma etiqueta acima da barra, que leva de volta à pergunta.
-// Destino, categoria, UHs e público mudam o que é construído; tarifa, ocupação e orçamento só
-// mudam as contas.
+// Questionário que monta o hotel no mapa enquanto é respondido. Uma pergunta por vez; cada
+// resposta vira uma etiqueta acima da barra, que leva de volta à pergunta. Destino, categoria,
+// UHs e público mudam o que é construído; nome, tarifa, ocupação e orçamento só mudam o relatório.
 
 let timer = 0
 function update(patch: Partial<Spec>, wait: number) {
@@ -42,16 +42,26 @@ const Meter = ({ n }: { n: number }) => (
     ))}
   </svg>
 )
+// faixa de orçamento: colunas crescentes, preenchidas até a faixa
+const Stack = ({ n }: { n: number }) => (
+  <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+    {Array.from({ length: 5 }, (_, i) => (
+      <rect key={i} x={3.5 + i * 5.3} y={27 - (i + 1) * 4.4} width="3.8" height={(i + 1) * 4.4} fill={i < n ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.1" />
+    ))}
+  </svg>
+)
 
 // ── perguntas ──────────────────────────────────────────────────────────────
-type Key = 'destino' | 'categoria' | 'uhs' | 'publico' | 'adr' | 'ocupacao' | 'orcamento'
-interface Opt { id: string; label: string; sub: string; glyph: ReactNode }
+type Key = 'nome' | 'destino' | 'categoria' | 'uhs' | 'publico' | 'adr' | 'ocupacao' | 'orcamento'
+interface Opt { id: string; label: string; sub?: string; glyph: ReactNode }
 type Step = { key: Key; label: string; title: string; hint: string } & (
-  | { kind: 'choice'; options: Opt[] }
+  | { kind: 'text'; placeholder: string }
+  | { kind: 'choice'; options: Opt[]; skip?: string }
   | { kind: 'number'; min: number; max: number; step: number; prefix?: string; suffix?: string; skip?: string }
 )
 
 const STEPS: Step[] = [
+  { key: 'nome', kind: 'text', label: 'Projeto', title: 'Qual o nome do projeto?', hint: 'Ele vai na capa do relatório e no arquivo salvo.', placeholder: 'Ex.: Resort Praia Dourada' },
   {
     key: 'destino', kind: 'choice', label: 'Destino', title: 'Onde fica o hotel?', hint: 'O destino escolhe o desenho do terreno.',
     options: [
@@ -76,20 +86,41 @@ const STEPS: Step[] = [
   },
   { key: 'adr', kind: 'number', label: 'Tarifa', title: 'Qual a tarifa média esperada?', hint: 'Sem resposta, vale a diária de referência do mercado.', min: 150, max: 6000, step: 10, prefix: 'R$', skip: 'Usar a do mercado' },
   { key: 'ocupacao', kind: 'number', label: 'Ocupação', title: 'E a ocupação média esperada?', hint: 'Sem resposta, vale a ocupação de referência da categoria.', min: 20, max: 100, step: 1, suffix: '%', skip: 'Usar a do mercado' },
-  { key: 'orcamento', kind: 'number', label: 'Orçamento', title: 'Quanto há para investir?', hint: 'Serve para comparar com o investimento do relatório.', min: 10, max: 1000, step: 5, prefix: 'R$', suffix: 'mi', skip: 'Sem orçamento' },
+  {
+    key: 'orcamento', kind: 'choice', label: 'Orçamento', title: 'Quanto há para investir?', hint: 'Basta a faixa. O relatório compara com o investimento.', skip: 'Sem orçamento',
+    options: BUDGETS.map((b, i) => ({ id: b.id, label: b.label.replace('R$ ', ''), glyph: <Stack n={i + 1} /> })), // em milhões de reais
+  },
 ]
 const N = STEPS.length
 
-// valor do campo na unidade da pergunta (orçamento em milhões)
-const read = (spec: Spec, k: Key) => (k === 'orcamento' ? (spec.orcamento == null ? null : spec.orcamento / 1e6) : spec[k])
-const write = (k: Key, v: string | number | null): Partial<Spec> => (k === 'orcamento' ? { orcamento: v == null ? null : (v as number) * 1e6 } : { [k]: v })
+interface Answers { spec: Spec; name: string }
+// valor da resposta: o nome fica fora do Spec, no nome do projeto
+const valueOf = (k: Key, a: Answers) => (k === 'nome' ? a.name.trim() || null : a.spec[k])
 const fmtNum = (s: Step, v: number) => `${s.kind === 'number' && s.prefix ? `${s.prefix} ` : ''}${v.toLocaleString('pt-BR')}${s.kind === 'number' && s.suffix ? (s.suffix === '%' ? '%' : ` ${s.suffix}`) : ''}`
 
-function crumbText(s: Step, spec: Spec, skipped: boolean) {
-  const v = read(spec, s.key)
+function crumbText(s: Step, v: string | number | null, skipped: boolean) {
   if (v == null) return skipped ? (s.key === 'orcamento' ? 'sem' : 'mercado') : ''
+  if (s.kind === 'text') return String(v)
   if (s.kind === 'choice') return s.options.find((o) => o.id === v)?.label ?? ''
   return s.key === 'uhs' ? `${v} UHs` : fmtNum(s, v as number)
+}
+
+// ── nome do projeto: campo grande em Editorial ─────────────────────────────
+function NameField({ s, value, onNext }: { s: Extract<Step, { kind: 'text' }>; value: string; onNext: () => void }) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => { ref.current?.focus() }, [])
+  return (
+    <div className="dial">
+      <label className="dial-value name-value">
+        <input ref={ref} value={value} placeholder={s.placeholder} maxLength={60} aria-label={s.title}
+          onChange={(e) => useStore.getState().setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && value.trim()) onNext() }} />
+      </label>
+      <div className="dial-go">
+        <button className="btn primary" onClick={onNext} disabled={!value.trim()}>Seguir</button>
+      </div>
+    </div>
+  )
 }
 
 // ── controle numérico: número grande, − e +, régua e atalhos ──────────────
@@ -137,62 +168,89 @@ function Dial({ s, value, fallback, presets, onChange, onNext, onSkip }: {
 
 export function AnalystBar({ ev, biz }: { ev: Evaluation; biz: Business }) {
   const spec = useStore((s) => s.spec)
-  const [skipped, setSkipped] = useState<Set<Key>>(new Set())
-  const done = (s: Step, sp: Spec, sk: Set<Key>) => read(sp, s.key) != null || sk.has(s.key)
-  const firstOpen = (from: number, sp: Spec, sk: Set<Key>) => {
-    for (let k = 1; k <= N; k++) { const i = (from + k) % N; if (!done(STEPS[i], sp, sk)) return i }
+  const name = useStore((s) => s.hotelName)
+  const answers = { spec, name }
+  // as puladas ficam no estado global: fechar o checklist e voltar não as esquece
+  const skippedList = useStore((s) => s.skipped)
+  const skipped = useMemo(() => new Set(skippedList as Key[]), [skippedList])
+  const done = (s: Step, a: Answers, sk: Set<Key>) => valueOf(s.key, a) != null || sk.has(s.key)
+  const firstOpen = (from: number, a: Answers, sk: Set<Key>) => {
+    for (let k = 1; k <= N; k++) { const i = (from + k) % N; if (!done(STEPS[i], a, sk)) return i }
     return N
   }
-  const [step, setStep] = useState(() => firstOpen(N - 1, spec, skipped))
+  const [step, setStep] = useState(() => firstOpen(N - 1, answers, skipped))
 
-  // campos trocados de fora (modelo aberto, esboço, limpar): volta para a primeira pergunta aberta
+  // respostas trocadas de fora (modelo aberto, esboço, limpar): volta para a primeira pergunta aberta
   const internal = useRef(false)
+  const seen = useRef(spec)
   useEffect(() => {
+    if (seen.current === spec) return // montagem
+    seen.current = spec
     if (internal.current) { internal.current = false; return }
-    const sk = new Set<Key>()
-    setSkipped(sk)
-    setStep(firstOpen(N - 1, spec, sk))
+    const st = useStore.getState()
+    setStep(firstOpen(N - 1, { spec, name: st.hotelName }, new Set(st.skipped as Key[])))
   }, [spec]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // o board e os avisos ficam acima da barra (e das etiquetas), seja qual for a altura dela
+  const wrap = useRef<HTMLDivElement>(null)
+  const crumbs = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const measure = () => {
+      const c = crumbs.current!.offsetHeight
+      const h = 16 + wrap.current!.offsetHeight + (c ? c + 10 : 0) + 8
+      view.inset.bottom = h
+      document.documentElement.style.setProperty('--above-quiz', `${h}px`)
+    }
+    const ro = new ResizeObserver(measure)
+    ro.observe(wrap.current!)
+    ro.observe(crumbs.current!)
+    return () => ro.disconnect()
+  }, [])
 
   const answer = (k: Key, v: string | number | null, wait: number) => {
     internal.current = true
-    update(write(k, v), wait)
+    update({ [k]: v } as Partial<Spec>, wait)
   }
   const advance = (from: number, sk = skipped) => {
-    window.setTimeout(() => setStep(firstOpen(from, useStore.getState().spec, sk)), 320)
+    window.setTimeout(() => {
+      const st = useStore.getState()
+      setStep(firstOpen(from, { spec: st.spec, name: st.hotelName }, sk))
+    }, 320)
+  }
+  const skip = (k: Key) => {
+    useStore.getState().skip(k)
+    answer(k, null, 0)
+    advance(step, new Set(skipped).add(k))
   }
   const s = STEPS[step]
   const open = (t: 'checklist' | 'explain') => useStore.getState().openModal(t)
 
   const presetsOf = (st: Extract<Step, { kind: 'number' }>): { fallback: number; presets: number[] } => {
     const r = (v: number) => Math.min(st.max, Math.max(st.min, Math.round(v / st.step) * st.step))
-    if (st.key === 'uhs') return { fallback: 120, presets: [60, 120, 200, 300, 450] }
     if (st.key === 'adr') { const m = r(ev.adr || 800); return { fallback: m, presets: [0.8, 0.9, 1, 1.15, 1.3].map((f) => r(m * f)) } }
     if (st.key === 'ocupacao') { const m = Math.round((ev.occ || 0.6) * 100); return { fallback: m, presets: [m - 10, m - 5, m, m + 5, m + 10].map(r) } }
-    const m = r((biz.investment || 100e6) / 1e6)
-    return { fallback: m, presets: [0.8, 1, 1.2, 1.5].map((f) => r(m * f)) }
+    return { fallback: 120, presets: [60, 120, 200, 300, 450] }
   }
 
   return (
-    <motion.div className="quiz-wrap" initial={{ y: 160, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 160, opacity: 0 }}
+    <motion.div ref={wrap} className="quiz-wrap" initial={{ y: 160, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 160, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 220, damping: 28 }}>
-      <div className="crumbs">
+      <div className="crumbs" ref={crumbs}>
         <AnimatePresence initial={false}>
-          {STEPS.map((st, i) => done(st, spec, skipped) && (
-            <motion.button key={st.key} layout className={`crumb ${i === step ? 'on' : ''}`} onClick={() => setStep(i)}
+          {STEPS.map((st, i) => done(st, answers, skipped) && (
+            <motion.button key={st.key} layout className={`crumb fields ${i === step ? 'on' : ''}`} onClick={() => setStep(i)}
               initial={{ opacity: 0, y: 14, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
               transition={{ type: 'spring', stiffness: 420, damping: 30 }}>
-              <span className="lb">{st.label}</span><b>{crumbText(st, spec, skipped.has(st.key))}</b>
+              <span className="lb">{st.label}</span><b>{crumbText(st, valueOf(st.key, answers), skipped.has(st.key))}</b>
             </motion.button>
           ))}
         </AnimatePresence>
       </div>
 
-      <div className="panel quiz">
+      <div className="quiz fields">
         <div className="q-count">
           <div className="nm"><b>{String(Math.min(step + 1, N)).padStart(2, '0')}</b><i>/{String(N).padStart(2, '0')}</i></div>
-          <div className="q-progress">{STEPS.map((st, i) => <span key={st.key} className={i === step ? 'cur' : done(st, spec, skipped) ? 'done' : ''} />)}</div>
-          <small>Ctrl+B construtor</small>
+          <div className="q-progress">{STEPS.map((st, i) => <span key={st.key} className={i === step ? 'cur' : done(st, answers, skipped) ? 'done' : ''} />)}</div>
         </div>
 
         <div className="q-main">
@@ -202,10 +260,12 @@ export function AnalystBar({ ev, biz }: { ev: Evaluation; biz: Business }) {
               {s ? (
                 <>
                   <div className="q-text"><h3>{s.title}</h3><p>{s.hint}</p></div>
-                  {s.kind === 'choice' ? (
+                  {s.kind === 'text' ? (
+                    <NameField s={s} value={name} onNext={() => { useStore.getState().setName(name.trim()); advance(step) }} />
+                  ) : s.kind === 'choice' ? (
                     <div className="opts">
                       {s.options.map((o, i) => {
-                        const on = read(spec, s.key) === o.id
+                        const on = valueOf(s.key, answers) === o.id
                         return (
                           <motion.button key={o.id} className={`opt ${on ? 'on' : ''}`} aria-pressed={on}
                             initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.04 + i * 0.05, type: 'spring', stiffness: 420, damping: 30 } }}
@@ -213,21 +273,17 @@ export function AnalystBar({ ev, biz }: { ev: Evaluation; biz: Business }) {
                             onClick={() => { answer(s.key, o.id, 40); advance(step) }}>
                             {on && <motion.span layoutId={`opt-${s.key}`} className="opt-pill" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
                             <span className="glyph">{o.glyph}</span>
-                            <span className="txt"><b>{o.label}</b><small>{o.sub}</small></span>
+                            <span className="txt"><b>{o.label}</b>{o.sub && <small>{o.sub}</small>}</span>
                           </motion.button>
                         )
                       })}
+                      {s.skip && <button className="btn ghost skip" onClick={() => skip(s.key)}>{s.skip}</button>}
                     </div>
                   ) : (
-                    <Dial key={s.key} s={s} value={read(spec, s.key) as number | null} {...presetsOf(s)}
+                    <Dial key={s.key} s={s} value={valueOf(s.key, answers) as number | null} {...presetsOf(s)}
                       onChange={(v) => answer(s.key, v, s.key === 'uhs' ? 450 : 0)}
-                      onNext={(v) => { if (read(useStore.getState().spec, s.key) == null) answer(s.key, v, 40); advance(step) }}
-                      onSkip={s.skip ? () => {
-                        const sk = new Set(skipped).add(s.key)
-                        setSkipped(sk)
-                        answer(s.key, null, 0)
-                        advance(step, sk)
-                      } : undefined} />
+                      onNext={(v) => { if (valueOf(s.key, { spec: useStore.getState().spec, name }) == null) answer(s.key, v, 40); advance(step) }}
+                      onSkip={s.skip ? () => skip(s.key) : undefined} />
                   )}
                 </>
               ) : (

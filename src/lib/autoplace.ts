@@ -2,18 +2,15 @@ import { ITEM_BY_ID } from '../data/catalog'
 import { GRID, footprint, useStore, type SketchItem, type TemplateId } from '../store'
 import type { Placed, Rot } from './valuation'
 
-// Posicionamento automático: ao clicar num item do catálogo, ele vai para o lugar que mais faz
-// sentido no terreno, seguindo leituras de implantação de resorts (zonas, vizinhanças, ruído,
-// orientação) e ligado aos vizinhos por caminho quando estão a 3–7 blocos de distância.
+// Posicionamento automático: cada item do programa vai para o lugar que mais faz sentido no
+// terreno, seguindo leituras de implantação de resorts (zonas, vizinhanças, ruído, orientação) e
+// ligado aos vizinhos por caminho quando estão a 3–7 blocos de distância.
 
 type Cell = { x: number; z: number }
 type Rect = { x: number; z: number; w: number; d: number }
 type Side = 'n' | 's' | 'e' | 'w'
 // Papéis do terreno; cada modelo de implantação decide onde fica cada um
 export type Role = 'arrival' | 'core' | 'lodging' | 'luxury' | 'sports' | 'fun'
-export const ROLE_LABEL: Record<Role, string> = {
-  arrival: 'Chegada', core: 'Lazer', lodging: 'Hospedagem', luxury: 'Luxo e spa', sports: 'Esportes', fun: 'Diversão',
-}
 // Para onde a frente aponta: núcleo, chegada (sul), vista do modelo, água, ou o que o modelo
 // define para as alas de hospedagem ('lodge')
 type Face = 'core' | 'arrival' | 'view' | 'water' | 'lodge'
@@ -33,8 +30,6 @@ export const PATH_MAX = 7
 
 interface Template {
   name: string
-  short: string           // rótulo curto do seletor
-  note: string            // resumo mostrado no catálogo
   zones: Record<Role, Rect[]>  // um papel pode ocupar mais de um retângulo (quartos em ferradura)
   view: Cell | null       // direção da vista; null = para fora do núcleo
   lodge: 'core' | 'view'  // para onde as alas de hospedagem se voltam
@@ -53,8 +48,6 @@ export const TEMPLATES: Record<TemplateId, Template> = {
   // voltados para a piscina, quadras junto à entrada e ao estacionamento, luxo num lado reservado.
   nucleo: {
     name: 'Núcleo central',
-    short: 'Núcleo',
-    note: 'Piscina e restaurantes no meio, quartos em ferradura voltados para eles, quadras junto à entrada e luxo num lado reservado.',
     zones: {
       arrival: [{ x: 10, z: 32, w: 18, d: 8 }],
       core: [{ x: 10, z: 9, w: 18, d: 23 }],
@@ -74,8 +67,6 @@ export const TEMPLATES: Record<TemplateId, Template> = {
   // quadras no interior do terreno, villas e spa numa ponta silenciosa.
   praia: {
     name: 'Frente de mar',
-    short: 'Frente de mar',
-    note: 'Mar ao fundo: quartos em fileiras de frente para a praia, lazer entre eles e a areia, villas na ponta.',
     zones: {
       arrival: [{ x: 10, z: 32, w: 30, d: 8 }],
       core: [{ x: 10, z: 0, w: 20, d: 13 }],
@@ -108,8 +99,6 @@ export const TEMPLATES: Record<TemplateId, Template> = {
   // ao mar por caminhos próprios, sem carros; o estacionamento fica na chegada.
   vila: {
     name: 'Vila de bangalôs',
-    short: 'Vila',
-    note: 'Núcleo compacto junto à chegada; villas e bangalôs espalhados rumo ao mar por caminhos próprios, sem carros.',
     zones: {
       arrival: [{ x: 0, z: 34, w: 30, d: 6 }],
       core: [{ x: 10, z: 24, w: 20, d: 10 }],
@@ -661,21 +650,10 @@ export function placeOn(s: Site, id: string, link = true): Plan {
   }
 }
 
-// Constrói `n` unidades do item onde fazem mais sentido, sem selecionar (respostas do checklist);
-// devolve quantas couberam
+// Constrói `n` unidades do item onde fazem mais sentido (respostas do checklist); devolve quantas couberam
 export function autoAdd(id: string, n = 1) {
   const s = readSite()
   const items: SketchItem[] = []
   for (let k = 0; k < n; k++) items.push(...placeOn(s, id).items)
   return useStore.getState().addItems(items, 110).filter((p) => p.itemId === id).length
-}
-
-export function autoPlace(id: string) {
-  const store = useStore.getState()
-  const special = !!SPECIAL[id]
-  const plan = placeOn(readSite(), id)
-  const added = store.addItems(plan.items, special ? 45 : 110)
-  if (plan.items.length && !added.length) { store.notify(`Não há espaço livre para ${ITEM_BY_ID[id].name.toLowerCase()}`); return }
-  if (!special && added.length) store.select(added[0].uid)
-  store.notify(plan.note)
 }

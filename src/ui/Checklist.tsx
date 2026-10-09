@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { money } from '../lib/valuation'
 import { answerScope } from '../lib/program'
 import type { Business } from '../lib/business'
-import { Counter } from './Summary'
+import { Counter } from './Counter'
 
 const pct = (v: number) => `${Math.round(v * 100)}%`
 const spring = { type: 'spring', stiffness: 500, damping: 34 } as const
@@ -31,7 +31,7 @@ export function Checklist({ biz, onClose }: { biz: Business; onClose: () => void
   const n = biz.scope.length
 
   return (
-    <motion.aside className="panel checklist" initial={{ x: 440, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 440, opacity: 0 }}
+    <motion.aside className="panel checklist fields" initial={{ x: 440, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 440, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 220, damping: 28 }}>
       <header className="ck-head">
         <div className="ck-step"><b>01</b><i>/02</i></div>

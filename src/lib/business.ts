@@ -1,6 +1,6 @@
 import { ITEM_BY_ID } from '../data/catalog'
 import { TIERS, type Evaluation, type Placed } from './valuation'
-import type { Spec, TierId } from './spec'
+import { BUDGETS, type Spec, type TierId } from './spec'
 
 // Visão de negócios: o investimento confirmado pelo checklist e a operação do hotel projetada em
 // 10 anos, com os indicadores que um investidor de hotelaria pede: TRevPAR, GOP, EBITDA, yield on
@@ -178,7 +178,7 @@ export function business(ev: Evaluation, live: Placed[], spec: Spec, checks: Rec
   return {
     scope, extras, obra, confirmed, pending, investment,
     adr, adrOwn, occ, occOwn,
-    budget: spec.orcamento && spec.orcamento > 0 ? spec.orcamento : null,
+    budget: BUDGETS.find((b) => b.id === spec.orcamento) ?? null,
     ready: ok,
     // operação estabilizada (a partir do ano 3)
     revpar: adr * occ,

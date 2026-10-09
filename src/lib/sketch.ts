@@ -1,10 +1,11 @@
 import { TIERS, type Placed } from './valuation'
 import type { SketchItem } from '../store'
-import { DESTINOS, EMPTY_SPEC, PUBLICOS, type Spec } from './spec'
+import { BUDGETS, DESTINOS, EMPTY_SPEC, PUBLICOS, type Spec } from './spec'
 
 // Esboço salvo: um JSON com o nome do hotel, a lista de itens (id do catálogo, célula e rotação)
 // e, quando houver, os campos do modo analista e as respostas do checklist.
-const APP = 'roomi-resort-builder'
+const APP = 'roomi-builder'
+const OLD_APP = 'roomi-resort-builder' // esboços salvos antes do nome Builder
 
 export interface Analysis { spec: Spec; checks: Record<string, boolean> }
 
@@ -45,7 +46,8 @@ function readAnalysis(v: unknown): Analysis {
       destino: pick(s.destino, DESTINOS),
       categoria: pick(s.categoria, TIERS as { id: Spec['categoria'] & string }[]),
       publico: pick(s.publico, PUBLICOS),
-      uhs: num(s.uhs), adr: num(s.adr), ocupacao: num(s.ocupacao), orcamento: num(s.orcamento),
+      uhs: num(s.uhs), adr: num(s.adr), ocupacao: num(s.ocupacao),
+      orcamento: pick(s.orcamento, BUDGETS) ?? BUDGETS.find((b) => { const v = num(s.orcamento); return v != null && v >= b.min && v < b.max })?.id ?? null,
     },
     checks,
   }
@@ -55,10 +57,10 @@ function readAnalysis(v: unknown): Analysis {
 export function parseSketch(text: string): { hotelName: string; items: SketchItem[]; invalid: number } & Analysis {
   let data: { app?: unknown; hotelName?: unknown; items?: unknown; analysis?: unknown }
   try { data = JSON.parse(text) } catch { throw new Error('O arquivo não é um JSON válido.') }
-  if (data?.app !== APP || !Array.isArray(data.items)) throw new Error('O arquivo não é um esboço do Resort Builder.')
+  if ((data?.app !== APP && data?.app !== OLD_APP) || !Array.isArray(data.items)) throw new Error('O arquivo não é um esboço do Builder.')
   const items = data.items.filter(isItem)
   return {
-    hotelName: typeof data.hotelName === 'string' && data.hotelName.trim() ? data.hotelName : 'Meu Resort',
+    hotelName: typeof data.hotelName === 'string' ? data.hotelName.trim() : '', // sem nome, o questionário pergunta
     items,
     invalid: data.items.length - items.length,
     ...readAnalysis(data.analysis),

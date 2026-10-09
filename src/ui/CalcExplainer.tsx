@@ -35,7 +35,7 @@ export function CalcExplainer({ ev, biz, count, onClose }: { ev: Evaluation; biz
         <ol className="steps">
           <li>
             <h3>Custo de obra</h3>
-            <p>Cada item do catálogo tem um custo de obra de referência, que considera a área construída e o padrão de acabamento. O custo do hotel é a soma dos itens do mapa. O terreno não entra.</p>
+            <p>Cada item do mapa tem um custo de obra de referência, que considera a área construída e o padrão de acabamento. O custo do hotel é a soma dos itens. O terreno não entra.</p>
             <Calc label={`Soma de ${count} itens`} value={money(ev.cost)} />
             <div className="split">
               {CATS.filter((c) => ev.byCat.get(c.id)).map((c) => <span key={c.id}>{c.label} <b>{money(ev.byCat.get(c.id)!)}</b></span>)}
@@ -55,7 +55,7 @@ export function CalcExplainer({ ev, biz, count, onClose }: { ev: Evaluation; biz
             <Calc label="ADR = diária da categoria × fator do mix × bônus de amenidades" value="" />
             {t && <Calc label={`${money(t.adr)} × ${dec(ev.mixFactor)} × ${dec(ev.bonus)}`} value={money(ev.adr)} />}
             <p>O <b>mix</b> é a média do peso de diária das UHs: standard 1,0, família 1,15, chalé 1,2, suíte 1,4, bangalô 1,6 e villa 2,6. Ele entra pela raiz quadrada, limitado entre 0,85 e 2,6. O <b>bônus</b> soma 1% por tipo diferente de lazer ou serviço, até 12%{ev.keys ? <> (aqui, {ev.amenities} tipos: +{pct(ev.bonus - 1)})</> : null}.</p>
-            <p>A ocupação é a de referência da categoria{t ? <> ({pct(t.occ)})</> : null}. No modo analista, a tarifa e a ocupação esperadas substituem as de referência quando são preenchidas{biz.adrOwn || biz.occOwn ? <> (este hotel usa {[biz.adrOwn && 'a tarifa', biz.occOwn && 'a ocupação'].filter(Boolean).join(' e ')} informada)</> : null}.</p>
+            <p>A ocupação é a de referência da categoria{t ? <> ({pct(t.occ)})</> : null}. No questionário, a tarifa e a ocupação esperadas substituem as de referência quando são preenchidas{biz.adrOwn || biz.occOwn ? <> (este hotel usa {[biz.adrOwn && 'a tarifa', biz.occOwn && 'a ocupação'].filter(Boolean).join(' e ')} informada)</> : null}.</p>
           </li>
 
           <li>
@@ -76,7 +76,7 @@ export function CalcExplainer({ ev, biz, count, onClose }: { ev: Evaluation; biz
 
           <li>
             <h3>Investimento</h3>
-            <p>Parte da obra do mapa. Sim e Não no checklist do relatório constroem ou demolem no mapa, então o custo acompanha. Os custos fora da obra só entram quando confirmados: {EXTRAS.map((e) => `${e.ask.replace('?', '').toLowerCase()} (${pct(e.pct)})`).join(', ')}.</p>
+            <p>Parte da obra do mapa. Sim e Não no checklist do relatório constroem ou demolem no mapa, então o custo acompanha. Os custos fora da obra só entram quando confirmados: {EXTRAS.map((e) => `${e.ask.replace('?', '').toLowerCase()} (${pct(e.pct)})`).join(', ')}. A faixa de orçamento do questionário não entra na conta: o relatório só diz se o investimento cabe nela.</p>
             <Calc label="Investimento" value={money(biz.investment)} />
             <Calc label={`Custo por UH (mercado da categoria: ${t ? money(t.costPerKey) : '—'})`} value={brl(biz.perKey)} />
           </li>

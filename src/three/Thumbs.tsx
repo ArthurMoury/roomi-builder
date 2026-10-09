@@ -1,24 +1,34 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { createPortal, useThree } from '@react-three/fiber'
-import { ITEMS, ITEM_BY_ID } from '../data/catalog'
+import { ITEM_BY_ID } from '../data/catalog'
 import { MODELS, layoutOf } from '../data/models'
 import { GRID, footprint, linksOf, useStore, type SketchItem } from '../store'
 import { Model } from './models'
 import { C, halftones, mat } from './materials'
 import { Edges } from './parts'
 
-const ITEM_SIZE = { w: 152, h: 112 }   // miniatura do catálogo (2× o tamanho exibido no card)
 const MODEL_SIZE = { w: 560, h: 340 }  // imagem da galeria de modelos
-const VIEW = new THREE.Vector3(1, 0.85, 1.15).normalize()
-const MODEL_VIEW = new THREE.Vector3(1, 0.96, 1).normalize() // o mesmo ângulo da câmera inicial
+const MODEL_VIEW = new THREE.Vector3(0, Math.cos(0.86), Math.sin(0.86)) // de frente, como o board abre
 const PHOTO_SIZE = { w: 1600, h: 840 } // fachada para o relatório
 const FRONT_VIEW = new THREE.Vector3(0, 0.42, 1).normalize() // de frente, pela chegada (sul)
 
-// Resort inteiro sobre a laje, como no mapa (sem animação de obra)
-function Layout({ items }: { items: SketchItem[] }) {
+// Itens prontos, sem animação de obra (fotos e LP com movimento reduzido)
+export function StaticItems({ items }: { items: SketchItem[] }) {
   const placed = useMemo(() => items.map((it, k) => ({ uid: `t${k}`, itemId: it.id, x: it.x, z: it.z, rot: it.rot })), [items])
   const none = useMemo(() => new Set<string>(), [])
+  return placed.map((p) => {
+    const it = ITEM_BY_ID[p.itemId], f = footprint(p.itemId, p.rot)
+    return (
+      <group key={p.uid} position={[p.x + f.w / 2 - GRID / 2, 0, p.z + f.d / 2 - GRID / 2]} rotation-y={it.link ? 0 : p.rot * (Math.PI / 2)}>
+        <Model id={p.itemId} w={it.w} d={it.d} links={it.link ? linksOf(placed, none, p) : ''} rot={p.rot} />
+      </group>
+    )
+  })
+}
+
+// Resort inteiro sobre a laje, como no mapa
+function Layout({ items }: { items: SketchItem[] }) {
   return (
     <>
       <mesh rotation-x={-Math.PI / 2}>
@@ -34,14 +44,7 @@ function Layout({ items }: { items: SketchItem[] }) {
         <meshBasicMaterial color={C.coral} />
         <Edges color={C.ink} />
       </mesh>
-      {placed.map((p) => {
-        const it = ITEM_BY_ID[p.itemId], f = footprint(p.itemId, p.rot)
-        return (
-          <group key={p.uid} position={[p.x + f.w / 2 - GRID / 2, 0, p.z + f.d / 2 - GRID / 2]} rotation-y={it.link ? 0 : p.rot * (Math.PI / 2)}>
-            <Model id={p.itemId} w={it.w} d={it.d} links={it.link ? linksOf(placed, none, p) : ''} rot={p.rot} />
-          </group>
-        )
-      })}
+      <StaticItems items={items} />
     </>
   )
 }
@@ -97,13 +100,8 @@ const Lights = () => (
   </>
 )
 
-const itemSubjects: Subject[] = ITEMS.map((it) => ({
-  key: it.id, node: <Model id={it.id} w={it.w} d={it.d} />, size: ITEM_SIZE, view: VIEW, fill: 0.95, dots: 0.55,
-}))
-
-// Fotografa cada item do catálogo com o próprio modelo 3D, um por quadro, numa cena à parte.
-// Assim a imagem do card é sempre igual ao que o jogador vai construir. Quando a galeria de
-// modelos abre pela primeira vez, os modelos entram na fila.
+// Fotografa cada modelo da galeria com o próprio layout, um por vez, numa cena à parte. A fila só
+// começa quando a galeria abre pela primeira vez.
 export function Thumbs() {
   const gl = useThree((s) => s.gl)
   const [i, setI] = useState(0)
@@ -111,10 +109,8 @@ export function Thumbs() {
   const gallery = useStore((s) => s.modal?.type === 'models')
   useEffect(() => { if (gallery) setModels(true) }, [gallery])
   const subjects = useMemo<Subject[]>(() => models
-    ? [...itemSubjects, ...MODELS.map((m) => ({
-        key: `model:${m.id}`, node: <Layout items={layoutOf(m)} />, size: MODEL_SIZE, view: MODEL_VIEW, fill: 0.62, dots: 0.5,
-      }))]
-    : itemSubjects, [models])
+    ? MODELS.map((m) => ({ key: `model:${m.id}`, node: <Layout items={layoutOf(m)} />, size: MODEL_SIZE, view: MODEL_VIEW, fill: 0.62, dots: 0.5 }))
+    : [], [models])
   const scene = useMemo(() => new THREE.Scene(), [])
   const camera = useMemo(() => new THREE.PerspectiveCamera(30, 1, 0.1, 500), [])
   const targets = useMemo(() => new Map<Subject['size'], THREE.WebGLRenderTarget>(), [])
