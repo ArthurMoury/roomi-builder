@@ -24,6 +24,10 @@ const mi = (v: number) => num(v / 1e6, Math.abs(v) >= 1e8 ? 0 : 1)
 const brl = (v: number) => `R$ ${mi(v)} mi`
 const pct = (v: number, d = 0) => `${num(v * 100, d)}%`
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+// barras do caixa do retorno, crescendo uma depois da outra até k = 1
+const drawCash = (k: number) => document.querySelectorAll<SVGRectElement>('.lp-mini .bar').forEach((el, i, all) => {
+  el.style.transform = `scaleY(${clamp01(k * (all.length + 2) - i)})`
+})
 
 // As quatro etapas do negócio do exemplo; cada uma traz o seu grupo de elementos caindo do céu
 const BEATS: { title: string; lead: ReactNode; kpis: [string, string][]; chart?: boolean }[] = [
@@ -105,7 +109,11 @@ export default function Landing({ onStart }: { onStart: () => void }) {
   const [wantPhoto, setWantPhoto] = useState(false)
   const [reading, setReading] = useState<number | null>(null)
   const shown = Math.max(0, beat)
-  const b = BEATS[shown]
+  // a etapa na tela troca depois que a anterior sai (o texto some e o novo entra)
+  const [current, setCurrent] = useState(0)
+  const target = useRef(0)
+  const cashK = useRef(0)
+  const b = BEATS[current]
 
   useEffect(() => {
     let raf = 0
@@ -116,15 +124,14 @@ export default function Landing({ onStart }: { onStart: () => void }) {
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      const bars = () => gsap.utils.toArray<SVGRectElement>('.lp-mini .bar')
-      const draw = (k: number) => bars().forEach((el, i, all) => { el.style.transform = `scaleY(${clamp01(k * (all.length + 2) - i)})` })
       // a etapa do texto muda em degraus nítidos; o caixa do retorno se desenha com a rolagem
       ScrollTrigger.create({
         trigger: '.lp-build', start: 'top bottom', end: 'bottom bottom',
         onUpdate: (st) => {
           const p = st.progress * P_MAX
           setBeat(p < 0.5 ? -1 : Math.min(BEATS.length - 1, Math.floor(p - 0.5)))
-          draw(still ? 1 : clamp01((p - 3.65) / 0.75))
+          cashK.current = still ? 1 : clamp01((p - 3.65) / 0.75)
+          drawCash(cashK.current)
         },
       })
       // com a página clara por cima, o 3D para de desenhar; a foto da capa do relatório sai antes
@@ -136,8 +143,9 @@ export default function Landing({ onStart }: { onStart: () => void }) {
         const { motion, desk } = c.conditions as { motion: boolean; desk: boolean }
         if (!motion) { fall.intro = 1; return }
         // os elementos caem do céu: a abertura no carregamento, o resto com a rolagem
-        gsap.fromTo(fall, { intro: 0 }, { intro: 1, duration: 1.6, ease: 'none', delay: 0.15 })
-        gsap.fromTo(fall, { p: 0 }, { p: P_MAX, ease: 'none', scrollTrigger: { trigger: '.lp-build', start: 'top bottom', end: 'bottom bottom', scrub: 0.6 } })
+        gsap.fromTo(fall, { intro: 0 }, { intro: 1, duration: 1.8, ease: 'none', delay: 0.15 })
+        // scrub com inércia: os elementos seguem a rolagem com um leve atraso, sem tranco
+        gsap.fromTo(fall, { p: 0 }, { p: P_MAX, ease: 'none', scrollTrigger: { trigger: '.lp-build', start: 'top bottom', end: 'bottom bottom', scrub: 1.2 } })
         gsap.from('.lp-hero .rise', { y: 12, opacity: 0, duration: 0.42, stagger: 0.07, ease: 'power2.out', delay: 0.1 })
         // perguntas entram 12 px em 260 ms, uma depois da outra
         gsap.set('.lp-q', { opacity: 0, y: 12 })
@@ -174,12 +182,20 @@ export default function Landing({ onStart }: { onStart: () => void }) {
   // com movimento reduzido, o grupo da etapa aparece pousado, sem queda
   useEffect(() => { if (still) fall.p = beat + 1 }, [beat, still])
 
-  // a legenda nova entra antes de ser lida
-  useLayoutEffect(() => {
-    if (still || !cap.current) return
-    const tw = gsap.fromTo(cap.current.children, { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.26, stagger: 0.05, ease: 'power2.out' })
+  // troca da etapa: o texto atual sai em 160 ms e só então o novo entra, antes de ser lido
+  useEffect(() => {
+    target.current = shown
+    if (shown === current) return
+    if (still || !cap.current) { setCurrent(shown); return }
+    const tw = gsap.to(cap.current.children, { opacity: 0, y: -8, duration: 0.16, ease: 'power1.in', onComplete: () => setCurrent(target.current) })
     return () => { tw.kill() }
-  }, [shown, still])
+  }, [shown, current, still])
+  useLayoutEffect(() => {
+    drawCash(cashK.current)
+    if (still || !cap.current) return
+    const tw = gsap.fromTo(cap.current.children, { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, stagger: 0.05, ease: 'power2.out' })
+    return () => { tw.kill() }
+  }, [current, still])
 
   // leitor do relatório: trava a página, abre na folha clicada e fecha com Esc
   const scale = Math.min(1, (innerWidth - 48) / PAGE_W)
@@ -247,10 +263,10 @@ export default function Landing({ onStart }: { onStart: () => void }) {
         <div className="lp-stick">
           <div className="lp-beat">
             <div className="lp-count">
-              <div className="nm"><b>{String(shown + 1).padStart(2, '0')}</b><i>/{String(BEATS.length).padStart(2, '0')}</i></div>
+              <div className="nm"><b>{String(current + 1).padStart(2, '0')}</b><i>/{String(BEATS.length).padStart(2, '0')}</i></div>
               <div className="lp-prog">{BEATS.map((x, i) => <span key={x.title} className={i === shown ? 'cur' : i < shown ? 'done' : ''} />)}</div>
             </div>
-            <div className="cap" ref={cap} key={shown}>
+            <div className="cap" ref={cap} key={current}>
               <h2>{b.title}</h2>
               <p className="lp-lead">{b.lead}</p>
               <div className="lp-live">

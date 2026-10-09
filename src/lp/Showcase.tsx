@@ -12,9 +12,10 @@ import { SHOW } from './example'
 import { fall } from './motion'
 
 // Os elementos do resort caindo do céu, sem o board: um grupo na abertura e um em cada etapa do
-// negócio. A rolagem (GSAP, em fall.p) faz o grupo da vez cair e pousar enquanto o anterior segue
-// caindo até sumir; voltar a rolagem desfaz, porque a posição é função do progresso. Cada peça vem
-// sobre a sua placa do board, com o plano coral deslocado atrás.
+// negócio. A rolagem (GSAP, em fall.p) faz o grupo da etapa descer e pousar enquanto o anterior
+// segue descendo até sumir; voltar a rolagem desfaz, porque a posição é função do progresso. A troca
+// é macia: as janelas de saída e de entrada só se encostam, sem quique e quase sem giro. Cada peça
+// vem sobre a sua placa do board, com o plano coral deslocado atrás.
 
 type Piece = { id: string; x: number; z: number }
 const GROUPS: Piece[][] = [
@@ -31,18 +32,16 @@ const GROUPS: Piece[][] = [
 ]
 const LAST = GROUPS.length - 1
 const BOUNDS = { x0: -8.5, x1: 8.5, z0: -5.5, z1: 7 } // o que precisa caber no quadro
-const SKY = 26      // de quanto acima as peças caem
-const STAGGER = 0.1 // atraso entre as peças de um grupo, na janela de queda
+const SKY = 16        // de quanto acima as peças descem
+const DEPTH = 16      // quanto as que saem descem até sumir
+const STAGGER = 0.12  // atraso entre as peças de um grupo, na janela da troca
+// janelas da troca, em unidades de p: o grupo g entra em [g − 0,6, g − 0,25] e sai em [g + 0,25, g + 0,6];
+// a saída de um e a entrada do próximo se encostam em p = g + 0,5, onde o texto da etapa muda
+const IN_FROM = 0.6, IN_TO = 0.25, OUT_FROM = 0.25, OUT_TO = 0.6
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
-// pouso com quique, como uma peça que cai e assenta
-function bounce(t: number) {
-  const n = 7.5625, d = 2.75
-  if (t < 1 / d) return n * t * t
-  if (t < 2 / d) return n * (t -= 1.5 / d) * t + 0.75
-  if (t < 2.5 / d) return n * (t -= 2.25 / d) * t + 0.9375
-  return n * (t -= 2.625 / d) * t + 0.984375
-}
+const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10) // sai e chega devagar
+const easeIn = (t: number) => t * t * t                             // sai devagar, vai embora rápido
 
 const plateTop = new THREE.MeshBasicMaterial({ color: C.cream })
 const plateBack = new THREE.MeshBasicMaterial({ color: C.coral })
@@ -55,18 +54,18 @@ function PieceView({ piece, g, j, n }: { piece: Piece; g: number; j: number; n: 
   useEffect(() => () => plate.dispose(), [plate])
   const spin = j % 2 ? 1 : -1
   useFrame(() => {
-    // entrada: o grupo da abertura cai no carregamento; os outros, com a rolagem
-    const into = g === 0 ? fall.intro : clamp01((fall.p - (g - 0.75)) / 0.5)
-    const away = g === LAST ? 0 : clamp01((fall.p - (g + 0.25)) / 0.5)
+    // entrada: o grupo da abertura desce no carregamento; os outros, com a rolagem
+    const into = g === 0 ? fall.intro : clamp01((fall.p - (g - IN_FROM)) / (IN_FROM - IN_TO))
+    const away = g === LAST ? 0 : clamp01((fall.p - (g + OUT_FROM)) / (OUT_TO - OUT_FROM))
     const u = clamp01((into - j * STAGGER) / (1 - (n - 1) * STAGGER))
-    const v = clamp01((away - j * STAGGER * 0.5) / (1 - (n - 1) * STAGGER * 0.5))
+    const v = clamp01((away - j * STAGGER * 0.6) / (1 - (n - 1) * STAGGER * 0.6))
     const o = ref.current
     o.visible = u > 0 && v < 1
     if (!o.visible) return
-    const e = bounce(u)
-    o.position.y = SKY * (1 - e) - SKY * 1.3 * v * v
-    o.rotation.y = (1 - e) * 1.3 * spin + v * v * 0.9 * spin
-    o.rotation.x = (1 - e) * 0.25 * spin
+    const e = smoother(u), f = easeIn(v)
+    o.position.y = SKY * (1 - e) - DEPTH * f
+    o.rotation.y = ((1 - e) * 0.4 + f * 0.25) * spin
+    o.rotation.x = (1 - e) * 0.1 * spin
   })
   return (
     <group ref={ref} position={[piece.x, 0, piece.z]} visible={false}>
