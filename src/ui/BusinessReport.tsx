@@ -3,7 +3,8 @@ import { motion } from 'motion/react'
 import { useStore } from '../store'
 import { CATS } from '../data/catalog'
 import { TIERS, money, type Evaluation } from '../lib/valuation'
-import { DESTINOS, PUBLICOS, type Spec, type TierId } from '../lib/spec'
+import { DESTINOS, PUBLICOS, templateOf, type Spec, type TierId } from '../lib/spec'
+import { TEMPLATES } from '../lib/autoplace'
 import { ASSUME, BY_TIER, type Business } from '../lib/business'
 
 // Relatório de negócios em folhas A4, com os elementos dos PDFs da Roomi (RoomiVault › design ›
@@ -140,6 +141,17 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
   const heat = (v: number | null) => (v == null ? undefined : `rgba(249, 123, 85, ${Math.min(0.85, Math.max(0.08, 0.08 + v * 2.2))})`)
   const maxAdr = Math.max(...TIERS.map((t) => t.adr), biz.adr) * 1.04
   const pays = biz.irr != null && biz.payback != null && biz.payback <= ASSUME.years
+  // as respostas por trás dos números
+  const ficha = [
+    ['Destino', destino ?? '—'],
+    ['Categoria do mapa', ev.tier?.name ?? '—'],
+    ['UHs', num(ev.keys)],
+    ['Público', publico ?? '—'],
+    ['Diária', `${money(biz.adr)}, ${biz.adrOwn ? 'esperada' : 'de mercado'}`],
+    ['Ocupação', `${pct(biz.occ)}, ${biz.occOwn ? 'esperada' : 'de mercado'}`],
+    ['Faixa de orçamento', biz.budget?.label ?? 'sem faixa'],
+    ['Implantação', spec.destino ? TEMPLATES[templateOf(spec)].name : '—'],
+  ]
 
   // onde vai o investimento: obra por área do catálogo, mais o que foi confirmado fora da obra
   const spend = [
@@ -210,6 +222,10 @@ export function ReportSheets({ name, spec, photo, ev, biz }: { name: string; spe
               <span className="pc">{pct(r.v / biz.investment)}</span>
             </div>
           ))}
+        </div>
+        <div className="ficha">
+          <span className="lb">Ficha do projeto</span>
+          <dl>{ficha.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
         </div>
         <div className="notes">
           {budget && <p className={budget.bad ? 'bad' : ''}>{budget.text}</p>}

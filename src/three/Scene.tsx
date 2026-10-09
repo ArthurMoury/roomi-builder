@@ -236,13 +236,12 @@ export function Island({ light, onTurn, rise = true }: { light: boolean; onTurn?
   )
 }
 
-// Tempo dos meios-tons, densidade dos pontos e resolução adaptativa: abaixo de ~45 quadros por
-// segundo o canvas perde densidade em vez de travar a animação; com folga, recupera
-export function Rig({ onDpr }: { onDpr?: (step: number) => void }) {
+// Tempo e densidade dos meios-tons. A resolução fica fixa: baixá-la quando a obra pesa (centenas de
+// peças subindo de uma vez) deixava o mapa borrado depois de escolher a categoria, sem voltar.
+export function Rig() {
   const gl = useThree((s) => s.gl)
   const get = useThree((s) => s.get)
   const dpr = useThree((s) => s.viewport.dpr)
-  const perf = useRef({ t: 0, n: 0, last: 0, flips: 0 })
   useEffect(() => setHalftoneDpr(dpr), [dpr])
   useEffect(() => {
     if (import.meta.env.DEV) Object.assign(window, { __r3f: get, __store: useStore })
@@ -253,29 +252,15 @@ export function Rig({ onDpr }: { onDpr?: (step: number) => void }) {
     const warm = new THREE.Group()
     const geo = new THREE.BoxGeometry()
     warm.add(new THREE.Mesh(geo, mat.cream), new THREE.Mesh(geo, mat.fence))
-    warm.position.y = -50
+    warm.position.y = -5000 // longe da câmera: compila sem aparecer no quadro
     scene.add(warm)
     gl.compileAsync(scene, camera).finally(() => { scene.remove(warm); geo.dispose() })
   }, [gl, get])
-  useFrame((_, dt) => {
-    for (const m of halftones) m.uniforms.uTime.value += dt
-    const p = perf.current
-    if (!onDpr || dt > 0.25 || p.flips > 4) return // aba em segundo plano não conta
-    p.t += dt
-    p.n++
-    if (p.t < 1) return
-    const fps = p.n / p.t
-    p.t = p.n = 0
-    const dir = fps < 45 ? -1 : fps > 58 ? 1 : 0
-    if (!dir) return
-    if (p.last && dir !== p.last) p.flips++
-    p.last = dir
-    onDpr(dir * 0.2)
-  })
+  useFrame((_, dt) => { for (const m of halftones) m.uniforms.uTime.value += Math.min(dt, 0.1) })
   return null
 }
 
-export const MAX_DPR = Math.min(window.devicePixelRatio, 2)
+export const DPR = Math.min(window.devicePixelRatio, 2) // nítido em telas de alta densidade, sem passar de 2
 
 const purge = (uid: string) => useStore.getState().purge(uid)
 const turn = (side: -1 | 1) => { view.turn += side }
@@ -302,10 +287,9 @@ export function Scene() {
   const light = useStore((s) => s.theme === 'light')
   // com o relatório, a galeria ou a explicação por cima, o mapa para de desenhar
   const covered = useStore((s) => s.explain || s.modal?.type === 'report' || s.modal?.type === 'models')
-  const [dpr, setDpr] = useState(MAX_DPR)
 
   return (
-    <Canvas flat dpr={dpr} frameloop={covered ? 'never' : 'always'} camera={{ fov: 30, near: 1, far: 900 }} gl={{ antialias: true }}>
+    <Canvas flat dpr={DPR} frameloop={covered ? 'never' : 'always'} camera={{ fov: 30, near: 1, far: 900 }} gl={{ antialias: true }}>
       <color attach="background" args={[light ? C.cream : C.ink]} />
       <ambientLight intensity={0.55} />
       <directionalLight position={[6, 14, 3]} intensity={1.6} />
@@ -313,7 +297,7 @@ export function Scene() {
       <StoreSea light={light} />
       {placed.map((p) => <StoreItem key={p.uid} p={p} />)}
       <CameraRig />
-      <Rig onDpr={(step) => setDpr((v) => Math.min(MAX_DPR, Math.max(0.6, +(v + step).toFixed(2))))} />
+      <Rig />
       <Thumbs />
       <FrontPhoto />
     </Canvas>

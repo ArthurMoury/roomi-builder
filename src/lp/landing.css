@@ -57,10 +57,11 @@
 .lp-prog span.cur { background: #F97B55; }
 .lp-beat .cap h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(40px, 4.6vw, 66px); line-height: 1; letter-spacing: -.015em; }
 .lp-beat .cap p { margin-top: 14px; font-size: 15px; line-height: 1.55; color: rgba(241, 233, 231, .8); }
-.lp-live { display: flex; border-top: 1px solid rgba(241, 233, 231, .16); padding-top: 18px; }
+.lp-live { display: grid; grid-template-columns: auto auto minmax(0, 1fr); border-top: 1px solid rgba(241, 233, 231, .16); padding-top: 18px; }
 .lp-live div { padding: 0 22px; border-left: 1px solid rgba(241, 233, 231, .16); }
 .lp-live div:first-child { padding-left: 0; border-left: 0; }
 .lp-live b { display: block; font-family: var(--font-display); font-weight: 300; font-size: 30px; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lp-live div:last-child b { white-space: normal; }
 .lp-skip { align-self: flex-start; padding: 0 0 2px; border-bottom: 1px solid currentColor; font: 700 10px var(--font-sans); letter-spacing: .16em; text-transform: uppercase; color: rgba(241, 233, 231, .58); }
 .lp-skip:hover { color: #F1E9E7; }
 
@@ -100,7 +101,7 @@
 /* Chamada final, no coral da contracapa */
 .lp-cta { position: relative; z-index: 1; min-height: 86svh; overflow: hidden; background: #F97B55; color: #1D1D1B; padding: clamp(80px, 12vw, 160px) var(--pad) 140px; }
 .lp-cta .lp-lede { color: rgba(29, 29, 27, .8); margin-bottom: 30px; }
-.lp-chapeu { position: absolute; right: -10px; bottom: 70px; width: min(500px, 44vw); transform: rotate(-6deg); pointer-events: none; }
+.lp-chapeu { position: absolute; right: var(--pad); bottom: 80px; width: min(480px, 42vw); transform: rotate(-6deg); pointer-events: none; }
 .lp-cta .lockup { position: absolute; left: var(--pad); bottom: 48px; }
 .lp-foot { position: relative; z-index: 1; background: #1D1D1B; padding: 28px var(--pad) 36px; font-size: 12px; line-height: 1.5; color: rgba(241, 233, 231, .55); }
 
@@ -116,4 +117,8 @@
   .lp-nav .lockup i { height: 24px; }
   .lp-nav .lockup span:last-child { font-size: 19px; }
   .lp-nav .lp-btn { padding: 0 12px; font-size: 10.5px; letter-spacing: .06em; }
+  .lp-live b { font-size: 24px; }
+  .lp-live div { padding: 0 14px; }
+  .lp-cash-svg text { font-size: 34px; }
+  .lp-cash-svg text.minor { display: none; }
 }

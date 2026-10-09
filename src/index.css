@@ -307,6 +307,11 @@ input { font: inherit; color: inherit; }
 .spend-row.top .track i { background: #F97B55; }
 .spend-row .v { font-family: var(--font-display); font-size: 17px; text-align: right; }
 .spend-row .pc { font-size: 11px; color: var(--mudo); text-align: right; }
+.ficha { margin-top: 36px; }
+.ficha dl { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid #1D1D1B; }
+.ficha dl div { padding: 10px 12px 12px 0; border-bottom: 1px solid rgba(29, 29, 27, .15); }
+.ficha dt { font: 700 8.5px var(--font-sans); letter-spacing: .14em; text-transform: uppercase; color: var(--mudo); }
+.ficha dd { margin-top: 5px; font-family: var(--font-display); font-size: 16px; line-height: 1.15; }
 .boxes { display: grid; gap: 10px; }
 .boxes.four { grid-template-columns: repeat(4, 1fr); }
 .box { outline: 1px solid #1D1D1B; outline-offset: -1px; padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 5px; min-height: 104px; }

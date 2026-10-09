@@ -38,9 +38,9 @@ A LP abre em `/` e o Builder em `/#builder` (cada um carrega à parte). O modo c
 - Quando a obra de um item termina, as peças dele viram poucas malhas, uma por material (`src/three/merge.ts`).
 - Nenhum item roda código por quadro, e o ponteiro só testa o terreno, não as centenas de peças.
 - O mapa para de desenhar enquanto o relatório, a galeria ou a explicação o cobrem. Na LP, o 3D para quando as seções claras o cobrem.
-- O canvas reduz a resolução sozinho se o FPS cair e recupera quando sobra folga.
+- A resolução do canvas é fixa: a da tela, até 2×. Baixá-la quando a obra pesa deixava o mapa borrado depois de escolher a categoria.
 - A LP abre com a planta estática do resort e carrega o 3D à parte. Sem WebGL, a planta fica.
-- Comparado à versão com construtor (tag `backup-construtor`), o Builder carrega 1.445 kB (414 kB em gzip) em vez de 1.591 kB (462 kB). Saíram o drei, o troika e as 59 fotos de catálogo tiradas na abertura.
+- Comparado à versão com construtor (tag `backup-construtor`), o Builder carrega 1.446 kB (415 kB em gzip) em vez de 1.591 kB (462 kB). Saíram o drei, o troika e as 59 fotos de catálogo tiradas na abertura.
 
 ## Design (RoomiVault › design)
 
@@ -53,12 +53,14 @@ A LP abre em `/` e o Builder em `/#builder` (cada um carrega à parte). O modo c
 
 ## O mar
 
-No destino praia, o mar fica na divisa de água do modelo de implantação (`src/three/Sea.tsx`). Tudo é desenhado num só shader:
+No destino praia, o mar é um bloco de maquete encostado na divisa de água do modelo de implantação (`src/three/Sea.tsx`):
 
-- uma faixa de areia em pontos miúdos junto ao terreno;
-- a espuma que lambe a areia e a linha da arrebentação, indo e voltando;
-- o mar em retícula, com os pontos coral crescendo para o fundo e ondas correndo para a areia;
-- as pontas e o horizonte somem aos poucos.
+- a mesma laje em meio-tom do terreno, um degrau abaixo dele, com contorno fino;
+- o tampo de água coral chapada;
+- junto ao terreno, a faixa de areia em pontos miúdos;
+- na linha d'água, a espuma creme vai e volta, com borda ondulada e contorno;
+- no mar, traços de onda creme correm para a praia;
+- o enquadramento da câmera passa a incluir o bloco, em qualquer giro.
 
 ## LP (`src/lp`)
 

@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { linksOf } from '../store'
 import { ITEM_BY_ID } from '../data/catalog'
 import { C } from '../three/materials'
-import { Island, Item, MAX_DPR, Rig } from '../three/Scene'
+import { DPR, Island, Item, Rig } from '../three/Scene'
 import { Sea } from '../three/Sea'
 import { StaticItems } from '../three/Thumbs'
 import { CameraRig, cam, resetView, view, type Inset } from '../three/view'
@@ -18,7 +18,6 @@ let seq = 0
 const STILL_ITEMS = SHOW.map((p) => ({ id: p.itemId, x: p.x, z: p.z, rot: p.rot }))
 
 export default function Showcase({ stage, turn, inset, paused, still }: { stage: number; turn: number; inset: Inset; paused: boolean; still: boolean }) {
-  const [dpr, setDpr] = useState(MAX_DPR)
   const [board, setBoard] = useState<Board>({ live: [], dying: new Set(), delay: {} })
 
   // enquadramento e giro vêm da LP; o primeiro já nasce no lugar, os seguintes a câmera persegue
@@ -56,7 +55,7 @@ export default function Showcase({ stage, turn, inset, paused, still }: { stage:
   }), [])
 
   return (
-    <Canvas flat dpr={dpr} frameloop={still ? 'demand' : paused ? 'never' : 'always'} camera={{ fov: 30, near: 1, far: 900 }} gl={{ antialias: true }}>
+    <Canvas flat dpr={DPR} frameloop={still ? 'demand' : paused ? 'never' : 'always'} camera={{ fov: 30, near: 1, far: 900 }} gl={{ antialias: true }}>
       <color attach="background" args={[C.ink]} />
       <ambientLight intensity={0.55} />
       <directionalLight position={[6, 14, 3]} intensity={1.6} />
@@ -67,7 +66,7 @@ export default function Showcase({ stage, turn, inset, paused, still }: { stage:
           links={ITEM_BY_ID[p.itemId].link ? linksOf(board.live, board.dying, p) : ''} onGone={gone} />
       ))}
       <CameraRig wheel={false} />
-      <Rig onDpr={still ? undefined : (s) => setDpr((v) => Math.min(MAX_DPR, Math.max(0.6, +(v + s).toFixed(2))))} />
+      <Rig />
     </Canvas>
   )
 }

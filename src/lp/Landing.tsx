@@ -88,7 +88,7 @@ function Cash() {
         return (
           <g key={p.t}>
             <rect className={`bar ${p.cum >= 0 ? 'pos' : 'neg'}`} x={cx - bw / 2} y={Math.min(y0, y1)} width={bw} height={Math.max(1, Math.abs(y1 - y0))} />
-            <text x={cx} y={H - 6} textAnchor="middle">{p.t === 0 ? 'obra' : `ano ${p.t}`}</text>
+            <text x={cx} y={H - 6} textAnchor="middle" className={p.t % 5 ? 'minor' : ''}>{p.t === 0 ? 'obra' : `ano ${p.t}`}</text>
           </g>
         )
       })}

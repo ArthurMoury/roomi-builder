@@ -1,69 +1,80 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { GRID } from '../store'
-import { C, halftones } from './materials'
+import { C, halftones, mat } from './materials'
+import { Edges } from './parts'
+import { boardBounds, view } from './view'
 
-// Mar da praia, além da divisa da água. Areia em pontos miúdos, a espuma que lambe a areia e a linha
-// da arrebentação indo e voltando, e o mar em retícula: os pontos coral crescem para o fundo (a
-// retícula da marca), ondas correm para a areia e tudo some nas pontas e no horizonte. Os pontos são
-// medidos na tela, como os outros meios-tons: o Rig acerta a densidade e anda o tempo.
+// Mar da praia, como um bloco de maquete encostado na divisa de água: a mesma laje em meio-tom do
+// terreno, um degrau abaixo dele, com o tampo de água coral chapada. Junto ao terreno fica a faixa
+// de areia em pontos miúdos; na linha d'água, a espuma creme vai e volta com um contorno fino; no
+// mar, traços de onda creme correm para a praia. Planos chapados, contorno e só as três cores.
 
-const W = 58    // largura da faixa, pouco além das laterais do terreno
-const D = 28    // da linha d'água até onde o mar some
-const SAND = 3  // areia entre o terreno e a água
-const f = (v: number) => v.toFixed(1)
+export const SEA_D = 12   // do terreno à borda do bloco (60 m)
+const SAND = 2.2          // faixa de areia junto ao terreno
+const WATER = -0.32       // o tampo fica um degrau abaixo do terreno
+const BASE = -1.22        // fundo da laje, como o do terreno
+const f = (v: number) => v.toFixed(2)
 
-const material = new THREE.ShaderMaterial({
-  transparent: true,
-  depthWrite: false,
+const top = new THREE.ShaderMaterial({
   uniforms: {
     uTime: { value: 0 },
-    uCell: { value: 8 },
-    uR: { value: 2.7 },
+    uCell: { value: 6 },   // grade dos pontos da areia (px)
+    uR: { value: 1.1 },
     uSea: { value: new THREE.Color(C.coral) },
-    uLine: { value: new THREE.Color(C.ink) },
+    uFoam: { value: new THREE.Color(C.cream) },
+    uInk: { value: new THREE.Color(C.ink) },
   },
   vertexShader: /* glsl */ `
     varying vec2 vP;
-    void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    void main(){
+      vP = vec2(position.x, ${f(SEA_D / 2)} - position.z); // ao longo da praia; do terreno para o mar
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
   fragmentShader: /* glsl */ `
-    uniform float uTime; uniform float uCell; uniform float uR; uniform vec3 uSea; uniform vec3 uLine;
+    uniform float uTime; uniform float uCell; uniform float uR; uniform vec3 uSea; uniform vec3 uFoam; uniform vec3 uInk;
     varying vec2 vP;
     float dots(float r) {
-      vec2 p = gl_FragCoord.xy + vec2(uTime * 2.0, uTime * 4.0);
+      vec2 p = gl_FragCoord.xy;
       p.x += mod(floor(p.y / uCell), 2.0) * uCell * 0.5;
       vec2 c = mod(p, uCell) - uCell * 0.5;
       return 1.0 - smoothstep(r - 0.7, r + 0.7, length(c));
     }
-    float line(float d) { return 1.0 - clamp(abs(d) / fwidth(d) - 0.5, 0.0, 1.0); }
+    // traço de largura w (px) centrado onde d = 0
+    float stroke(float d, float w) { return 1.0 - smoothstep(w, w + 1.0, abs(d) / max(fwidth(d), 1e-4)); }
     void main(){
-      float y = vP.y - ${f(SAND)};
-      float side = 1.0 - smoothstep(0.62, 1.0, abs(vP.x) / ${f(W / 2)});
-      float swash = -1.0 + 0.8 * sin(uTime * 0.7) + 0.25 * sin(vP.x * 0.31 + uTime * 0.9);
-      float surf = 1.7 + 0.35 * sin(uTime * 0.7 - 1.2) + 0.3 * sin(vP.x * 0.22 - uTime * 0.6);
-      float foam = max(line(y - swash), 0.7 * line(y - surf)) * side;
-      float a;
+      float x = vP.x, s = vP.y;
+      // linha d'água: a lambida avança e recua sobre a areia
+      float shore = ${f(SAND)} + 0.45 * sin(uTime * 0.8) + 0.18 * sin(x * 0.45 + uTime * 1.1);
       vec3 col;
-      if (y < swash) {
-        a = dots(uR * 0.36) * side * 0.6;
-        col = uLine;
+      if (s < shore) {
+        col = mix(uFoam, uSea, dots(uR) * 0.85); // areia: creme com pontos coral miúdos
       } else {
-        float t = clamp(y / ${f(D)}, 0.0, 1.0);
-        float wave = 0.5 + 0.5 * sin(y * 0.55 + uTime * 1.3 + sin(vP.x * 0.07) * 2.0);
-        a = dots(uR * mix(0.42, 1.2, smoothstep(0.0, 0.55, t)) * mix(0.78, 1.12, wave)) * side * (1.0 - smoothstep(0.55, 1.0, t));
-        col = uSea;
+        float q = s - shore;
+        // espuma creme logo depois da linha d'água, com a borda ondulada e contorno fino
+        float edge = 0.34 + 0.12 * sin(x * 1.3 - uTime * 2.0);
+        float fw = fwidth(q);
+        col = mix(uSea, uFoam, 1.0 - smoothstep(edge - fw, edge + fw, q));
+        col = mix(col, uInk, stroke(q - edge, 0.35) * 0.9);
+        // traços de onda: fileiras de traços curtos e ondulados que andam para a praia
+        float gap = 1.7;
+        float k = (s + uTime * 0.55) / gap;
+        float row = floor(k);
+        float d = (fract(k) - 0.5) * gap + 0.22 * sin(x * 1.1 + row * 2.3);
+        float u = fract((x + row * 1.37) / 3.1);
+        float dash = smoothstep(0.42, 0.42 + fwidth(u) * 1.5, u);
+        col = mix(col, uFoam, stroke(d, 0.6) * dash * smoothstep(0.7, 1.6, q));
       }
-      float alpha = max(a, foam);
-      if (alpha < 0.01) discard;
-      gl_FragColor = vec4(mix(col, uLine, step(a, foam)), alpha);
+      gl_FragColor = vec4(col, 1.0);
       #include <colorspace_fragment>
     }`,
 })
-material.userData = { cell: 8, r: 2.7 }
-halftones.push(material)
+top.userData = { cell: 6, r: 1.1 }
+halftones.push(top) // o Rig acerta a densidade dos pontos e anda o tempo
 
-// a faixa começa na divisa do terreno (y local 0) e vai até o horizonte
-const plane = new THREE.PlaneGeometry(W, SAND + D, 1, 1).translate(0, (SAND + D) / 2, 0)
+const block = new THREE.BoxGeometry(GRID, WATER - BASE, SEA_D)
+// faces: +x, −x, +y (tampo de água), −y, +z, −z
+const faces = [mat.slab, mat.slab, top, mat.slab, mat.slab, mat.slab]
 
 // "MAR" em Futura, espaçado, deitado na água
 function useLabel(color: string) {
@@ -98,15 +109,25 @@ function useLabel(color: string) {
 const TURN = { n: 0, w: Math.PI / 2, s: Math.PI, e: -Math.PI / 2 }
 
 export function Sea({ side, light }: { side: keyof typeof TURN; light: boolean }) {
-  const ink = light ? C.ink : C.cream
-  useEffect(() => { material.uniforms.uLine.value.set(ink) }, [ink])
-  const label = useLabel(ink)
+  const label = useLabel(C.ink) // grafite sobre coral: o texto aprovado nessa cor (~7:1)
+  // o enquadramento passa a incluir o bloco de mar
+  useEffect(() => {
+    const b = boardBounds(), far = GRID / 2 + SEA_D
+    if (side === 'n') b.z0 = -far
+    if (side === 's') b.z1 = far
+    if (side === 'w') b.x0 = -far
+    if (side === 'e') b.x1 = far
+    view.bounds = b
+    return () => { view.bounds = boardBounds() }
+  }, [side])
   return (
     <group rotation-y={TURN[side]}>
-      <mesh geometry={plane} material={material} position={[0, -0.75, -GRID / 2]} rotation-x={-Math.PI / 2} />
-      <mesh position={[0, -0.7, -GRID / 2 - SAND - 11]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[7, 1.75]} />
-        <meshBasicMaterial map={label} transparent opacity={0.85} depthWrite={false} />
+      <mesh geometry={block} material={faces} position={[0, (WATER + BASE) / 2, -GRID / 2 - SEA_D / 2]}>
+        <Edges color={light ? C.ink : C.cream} />
+      </mesh>
+      <mesh position={[0, WATER + 0.01, -GRID / 2 - SEA_D * 0.66]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[8, 2]} />
+        <meshBasicMaterial map={label} transparent depthWrite={false} />
       </mesh>
     </group>
   )
