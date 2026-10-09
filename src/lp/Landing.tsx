@@ -1,94 +1,88 @@
-import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { ITEM_BY_ID } from '../data/catalog'
 import { ASSUME } from '../lib/business'
-import type { TemplateId } from '../store'
 import type { Inset } from '../three/view'
-import { Plan, TemplatePlan } from './Plan'
-import { BIZ, EV, MODEL, SHOW, STAGE_FACTS } from './example'
+import { PAGE_H, PAGE_W, ReportSheets } from '../ui/ReportSheets'
+import { Plan } from './Plan'
+import { BIZ, EV, MODEL, SHOW } from './example'
+import { fall } from './motion'
 import './landing.css'
 
 gsap.registerPlugin(ScrollTrigger)
 
 // LP que antecede o Builder. Segue o cofre (design › Animação de rolagem e bibliotecas › GSAP): a
 // rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com position: sticky
-// e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. O 3D carrega à parte,
-// com a planta estática no lugar enquanto isso (ou de vez, sem WebGL). Números, todos do motor.
+// e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. Os elementos do resort
+// caem do céu no 3D, que carrega à parte, com a planta estática no lugar enquanto isso (ou de vez,
+// sem WebGL). Todos os números saem do motor, para o resort de exemplo.
 
 const Showcase = lazy(() => import('./Showcase'))
 
 const num = (v: number, d = 0) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const mi = (v: number) => num(v / 1e6, Math.abs(v) >= 1e8 ? 0 : 1)
-const pct = (v: number) => `${num(v * 100)}%`
-const count = (s: number, test: (id: string) => boolean) => SHOW.filter((p) => p.stage === s && test(p.itemId)).length
-const cat = (c: string) => (id: string) => ITEM_BY_ID[id].cat === c
+const brl = (v: number) => `R$ ${mi(v)} mi`
+const pct = (v: number, d = 0) => `${num(v * 100, d)}%`
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
-const BEATS = [
-  { title: 'Chegada', text: `A via entra pelo sul até a recepção, com portaria e estacionamento. ${STAGE_FACTS[0].added} peças abrem a obra.` },
-  { title: 'Hospedagem', text: `${STAGE_FACTS[1].keys} UHs em ${STAGE_FACTS[1].added} prédios de frente para o mar, no mix de quartos que a categoria pede.` },
-  { title: 'Lazer', text: `${count(2, cat('aquatico'))} áreas aquáticas, ${count(2, cat('gastronomia'))} restaurantes e bares e mais ${count(2, (id) => !['aquatico', 'gastronomia'].includes(ITEM_BY_ID[id].cat))} equipamentos de esporte, família e bem-estar, cada um onde faz sentido.` },
-  { title: 'Paisagismo', text: `${count(3, (id) => id.startsWith('path'))} trechos de caminho ligam os acessos e ${count(3, (id) => id === 'palm')} palmeiras fecham a obra. Um clique na lateral gira o board 90°, como no Builder.` },
+// As quatro etapas do negócio do exemplo; cada uma traz o seu grupo de elementos caindo do céu
+const BEATS: { title: string; lead: ReactNode; kpis: [string, string][]; chart?: boolean }[] = [
+  {
+    title: 'Investimento',
+    lead: <>Com <b>{brl(BIZ.investment)}</b>, um resort de {EV.keys} UHs sai do papel, sem contar o terreno.</>,
+    kpis: [[mi(BIZ.obra), 'R$ mi de obra'], [mi(BIZ.confirmed), 'R$ mi fora da obra'], [num(BIZ.perKey / 1e3), 'R$ mil por UH']],
+  },
+  {
+    title: 'Receita',
+    lead: <><b>{brl(BIZ.revenueYear)}</b> de receita por ano, com a operação estabilizada.</>,
+    kpis: [[num(BIZ.adr), 'R$ de diária média'], [pct(BIZ.occ), 'de ocupação'], [num(BIZ.revpar), 'R$ de RevPAR']],
+  },
+  {
+    title: 'Operação',
+    lead: <>EBITDA de <b>{brl(BIZ.ebitdaMonth)}</b> por mês, com margem de {pct(BIZ.ebitdaMargin)}.</>,
+    kpis: [[pct(BIZ.gopMargin), 'de margem GOP'], [mi(BIZ.ebitdaYear), 'R$ mi de EBITDA por ano'], [num(BIZ.jobs), 'empregos diretos']],
+  },
+  {
+    title: 'Retorno',
+    lead: <>TIR real de <b>{pct(BIZ.irr ?? 0, 1)}</b>, com a obra paga em {num(BIZ.payback ?? 0, 1)} anos.</>,
+    kpis: [[`${BIZ.npv < 0 ? '−' : '+'}${mi(Math.abs(BIZ.npv))}`, `R$ mi de VPL a ${pct(ASSUME.discount)}`], [pct(BIZ.breakEven ?? 1), 'ocupação de equilíbrio'], [mi(BIZ.value), 'R$ mi de valor do ativo']],
+    chart: true,
+  },
+]
+const P_MAX = 4.6 // a rolagem das etapas vai de 0 (abertura) a 4,6; a etapa k pousa em p = k + 1
+
+const QUESTIONS = [
+  { q: 'Onde fica o hotel?', why: 'Praia, campo ou serra mudam o desenho do terreno e o lazer que vende.' },
+  { q: 'Em que categoria ele vai competir?', why: 'A categoria fixa a diária de referência e o lazer obrigatório.' },
+  { q: 'Quantas UHs?', why: 'A escala dita a obra, as vagas, as piscinas e a receita.' },
+  { q: 'Para quem é o hotel?', why: 'Famílias, casais e eventos pedem lazer e receitas diferentes.' },
+  { q: 'Qual a tarifa média esperada?', why: 'A diária que você pretende praticar move toda a receita.' },
+  { q: 'E a ocupação média esperada?', why: 'Com a diária, ela forma o RevPAR, o motor da operação.' },
+  { q: 'Quanto há para investir?', why: 'Uma faixa basta. O estudo diz se o projeto cabe nela.' },
 ]
 
-const STEPS = [
-  { title: 'Questionário', text: 'Uma pergunta por vez: nome, destino, categoria, UHs, público, tarifa, ocupação e faixa de orçamento. Cada resposta muda o mapa na hora.' },
-  { title: 'Checklist de escopo', text: 'Sim ou Não em dez itens de lazer e serviços constrói ou demole no mapa. FF&E, projetos, pré-operacional e contingência entram quando confirmados.' },
-  { title: 'Relatório A4', text: 'Seis folhas para imprimir ou salvar em PDF: investimento, operação, caixa em 10 anos, TIR, VPL, payback e a diária entre as categorias.' },
-]
-
-const PLANS: { id: TemplateId; name: string; text: string; refs: string }[] = [
-  { id: 'nucleo', name: 'Núcleo central', text: 'Piscina e restaurantes no meio, quartos em ferradura voltados para eles, quadras junto à entrada.', refs: 'Grand Palladium Imbassaí e Club Med Trancoso (BA)' },
-  { id: 'praia', name: 'Frente de mar', text: 'Quartos em fileiras de frente para a praia, lazer entre eles e a areia, villas na ponta.', refs: 'Costão do Santinho (Florianópolis, SC)' },
-  { id: 'vila', name: 'Vila de bangalôs', text: 'Núcleo compacto na chegada, villas e bangalôs espalhados rumo ao mar por caminhos próprios.', refs: 'Nannai (Muro Alto, PE)' },
-]
-
-const KPIS = [
-  { label: 'Investimento', value: BIZ.investment / 1e6, d: BIZ.investment >= 1e8 ? 0 : 1, unit: 'R$ mi', text: 'Obra mais FF&E, projetos, pré-operacional e contingência. Sem terreno.' },
-  { label: 'TIR real', value: (BIZ.irr ?? 0) * 100, d: 1, unit: '%', text: `Em 10 anos, com a venda do hotel no ano 10 pelo cap rate de ${pct(ASSUME.capRate)}.` },
-  { label: 'EBITDA por mês', value: BIZ.ebitdaMonth / 1e6, d: 1, unit: 'R$ mi', text: 'Com a operação estabilizada, a partir do ano 3.' },
-  { label: 'Ocupação de equilíbrio', value: (BIZ.breakEven ?? 1) * 100, d: 0, unit: '%', text: `Abaixo dela a operação não cobre os custos. A prevista é ${pct(BIZ.occ)}.` },
-]
-
-// onde o board fica na tela: à direita do texto no desktop, em cima no celular
+// onde os elementos ficam na tela: à direita do texto no desktop, em cima no celular
 const insetFor = (w: number, h: number): Inset =>
   w >= 960 ? { top: 120, right: 64, bottom: 72, left: Math.round(w * 0.47) } : { top: 80, right: 16, bottom: Math.round(h * 0.52), left: 16 }
 
 const webgl = (() => { try { return !!document.createElement('canvas').getContext('webgl2') } catch { return false } })()
 
-// Número que anda até o valor novo (algarismos tabulares, sem pular de largura)
-function Tween({ value, format, still }: { value: number; format: (v: number) => string; still: boolean }) {
-  const ref = useRef<HTMLElement>(null)
-  const from = useRef<number | null>(null)
-  useLayoutEffect(() => {
-    const el = ref.current!
-    if (still || from.current == null) { el.textContent = format(value); from.current = value; return }
-    const o = { v: from.current }
-    from.current = value
-    const tw = gsap.to(o, { v: value, duration: 0.42, ease: 'power2.out', onUpdate: () => { el.textContent = format(o.v) } })
-    return () => { tw.kill() }
-  }, [value, format, still])
-  return <b ref={ref} />
-}
-const fmtInt = (v: number) => num(Math.round(v))
-const fmtMi = (v: number) => num(v, 1)
-
-// Caixa acumulado do exemplo: a obra afunda no ano 0 e o EBITDA traz de volta
-function Cash() {
+// Caixa acumulado do exemplo, compacto: a obra afunda no ano 0 e o EBITDA traz de volta
+function MiniCash() {
   const pts = [{ t: 0, cum: -BIZ.investment }, ...BIZ.years.map((y) => ({ t: y.t, cum: y.cum }))]
-  const W = 1000, H = 250, top = 16, bottom = 26
+  const W = 480, H = 132, top = 6, bottom = 22
   const lo = Math.min(0, ...pts.map((p) => p.cum)), hi = Math.max(0, ...pts.map((p) => p.cum))
   const y = (v: number) => top + ((hi - v) / (hi - lo || 1)) * (H - top - bottom)
-  const band = W / pts.length, bw = 26
+  const band = W / pts.length, bw = 16
   return (
-    <svg className="lp-cash-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Caixa acumulado do exemplo, da obra ao ano 10">
+    <svg className="lp-mini" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Caixa acumulado do exemplo, da obra ao ano 10">
       <line x1={0} x2={W} y1={y(0)} y2={y(0)} className="zero" />
       {pts.map((p) => {
         const cx = band * p.t + band / 2, y0 = y(0), y1 = y(p.cum)
         return (
           <g key={p.t}>
             <rect className={`bar ${p.cum >= 0 ? 'pos' : 'neg'}`} x={cx - bw / 2} y={Math.min(y0, y1)} width={bw} height={Math.max(1, Math.abs(y1 - y0))} />
-            <text x={cx} y={H - 6} textAnchor="middle" className={p.t % 5 ? 'minor' : ''}>{p.t === 0 ? 'obra' : `ano ${p.t}`}</text>
+            {p.t % 5 === 0 && <text x={cx} y={H - 5} textAnchor="middle">{p.t === 0 ? 'obra' : `ano ${p.t}`}</text>}
           </g>
         )
       })}
@@ -96,15 +90,22 @@ function Cash() {
   )
 }
 
+const STEP_GAP = 22   // espaço entre as folhas no leitor (o mesmo de .sheets)
+const READER_PAD = 64 // respiro acima da primeira folha no leitor (o mesmo de .lp-viewer-scroll)
+
 export default function Landing({ onStart }: { onStart: () => void }) {
   const root = useRef<HTMLDivElement>(null)
   const cap = useRef<HTMLDivElement>(null)
+  const reader = useRef<HTMLDivElement>(null)
   const [beat, setBeat] = useState(-1)
   const [paused, setPaused] = useState(false)
   const [still] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [inset, setInset] = useState(() => insetFor(innerWidth, innerHeight))
-  const facts = STAGE_FACTS[Math.max(0, beat)]
+  const [photo, setPhoto] = useState<string | null>(null)
+  const [wantPhoto, setWantPhoto] = useState(false)
+  const [reading, setReading] = useState<number | null>(null)
   const shown = Math.max(0, beat)
+  const b = BEATS[shown]
 
   useEffect(() => {
     let raf = 0
@@ -115,49 +116,63 @@ export default function Landing({ onStart }: { onStart: () => void }) {
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      // a obra: quatro etapas ao longo do palco preso; antes dele, só o terreno
+      const bars = () => gsap.utils.toArray<SVGRectElement>('.lp-mini .bar')
+      const draw = (k: number) => bars().forEach((el, i, all) => { el.style.transform = `scaleY(${clamp01(k * (all.length + 2) - i)})` })
+      // a etapa do texto muda em degraus nítidos; o caixa do retorno se desenha com a rolagem
       ScrollTrigger.create({
-        trigger: '.lp-build', start: 'top 65%', end: 'bottom bottom',
-        onUpdate: (st) => setBeat(Math.min(BEATS.length - 1, Math.floor(st.progress * BEATS.length))),
-        onLeaveBack: () => setBeat(-1),
+        trigger: '.lp-build', start: 'top bottom', end: 'bottom bottom',
+        onUpdate: (st) => {
+          const p = st.progress * P_MAX
+          setBeat(p < 0.5 ? -1 : Math.min(BEATS.length - 1, Math.floor(p - 0.5)))
+          draw(still ? 1 : clamp01((p - 3.65) / 0.75))
+        },
       })
-      // com a página clara por cima, o 3D para de desenhar
-      ScrollTrigger.create({ trigger: '.lp-steps', start: 'top top', onEnter: () => setPaused(true), onLeaveBack: () => setPaused(false) })
+      // com a página clara por cima, o 3D para de desenhar; a foto da capa do relatório sai antes
+      ScrollTrigger.create({ trigger: '.lp-questions', start: 'top top', onEnter: () => setPaused(true), onLeaveBack: () => setPaused(false) })
+      ScrollTrigger.create({ trigger: '.lp-questions', start: 'top bottom', once: true, onEnter: () => setWantPhoto(true) })
 
-      const bars = gsap.utils.toArray<SVGRectElement>('.lp-cash-svg .bar')
-      const draw = (p: number) => bars.forEach((b, i) => { b.style.transform = `scaleY(${gsap.utils.clamp(0, 1, p * (bars.length + 2) - i)})` })
       const mm = gsap.matchMedia()
-      mm.add('(prefers-reduced-motion: no-preference)', () => {
+      mm.add({ motion: '(prefers-reduced-motion: no-preference)', desk: '(min-width: 960px)' }, (c) => {
+        const { motion, desk } = c.conditions as { motion: boolean; desk: boolean }
+        if (!motion) { fall.intro = 1; return }
+        // os elementos caem do céu: a abertura no carregamento, o resto com a rolagem
+        gsap.fromTo(fall, { intro: 0 }, { intro: 1, duration: 1.6, ease: 'none', delay: 0.15 })
+        gsap.fromTo(fall, { p: 0 }, { p: P_MAX, ease: 'none', scrollTrigger: { trigger: '.lp-build', start: 'top bottom', end: 'bottom bottom', scrub: 0.6 } })
         gsap.from('.lp-hero .rise', { y: 12, opacity: 0, duration: 0.42, stagger: 0.07, ease: 'power2.out', delay: 0.1 })
-        // cartões entram 12 px em 260 ms e o plano de meio-tom vem 80 ms depois
-        gsap.set('.lp-card', { opacity: 0, y: 12 })
-        gsap.set('.lp-card .plane', { x: -10, y: -10, opacity: 0 })
-        ScrollTrigger.batch('.lp-card', {
-          start: 'top 86%', once: true,
-          onEnter: (els) => {
-            gsap.to(els, { opacity: 1, y: 0, duration: 0.26, stagger: 0.08, ease: 'power2.out' })
-            gsap.to(els.map((e) => (e as Element).querySelector('.plane')), { x: 0, y: 0, opacity: 1, duration: 0.26, delay: 0.08, stagger: 0.08, ease: 'power2.out' })
-          },
+        // perguntas entram 12 px em 260 ms, uma depois da outra
+        gsap.set('.lp-q', { opacity: 0, y: 12 })
+        ScrollTrigger.batch('.lp-q', {
+          start: 'top 88%', once: true,
+          onEnter: (els) => { gsap.to(els, { opacity: 1, y: 0, duration: 0.26, stagger: 0.06, ease: 'power2.out' }) },
         })
-        // números do exemplo correm uma vez, ao entrar
-        const figs = gsap.utils.toArray<HTMLElement>('.lp-kpis b[data-v]')
-        figs.forEach((el) => { el.textContent = num(0, Number(el.dataset.d)) })
-        ScrollTrigger.create({
-          trigger: '.lp-kpis', start: 'top 80%', once: true,
-          onEnter: () => figs.forEach((el, i) => {
-            const o = { v: 0 }, d = Number(el.dataset.d)
-            gsap.to(o, { v: Number(el.dataset.v), duration: 0.9, delay: i * 0.08, ease: 'power2.out', onUpdate: () => { el.textContent = num(o.v, d) } })
-          }),
-        })
-        // o caixa se desenha com a rolagem e se desfaz ao voltar
-        draw(0)
-        ScrollTrigger.create({ trigger: '.lp-cash', start: 'top 85%', end: 'bottom 60%', scrub: 0.4, onUpdate: (st) => draw(st.progress) })
+        // as folhas do relatório saem da pilha e abrem em leque com a rolagem (no celular, uma fila)
+        if (!desk) return
+        const deck = document.querySelector<HTMLElement>('.lp-deck')!
+        const sheets = gsap.utils.toArray<HTMLElement>('.lp-deck .sheet-wrap')
+        deck.classList.add('fan')
+        const k = { v: 0 }
+        const place = () => {
+          const sw = sheets[0].offsetWidth, spread = Math.min(215, (deck.clientWidth - sw) / (sheets.length - 1))
+          sheets.forEach((el, i) => {
+            const c = i - (sheets.length - 1) / 2
+            const x = gsap.utils.interpolate(c * 7, c * spread, k.v)
+            const y = gsap.utils.interpolate(Math.abs(c) * 3, c * c * 7, k.v)
+            const r = gsap.utils.interpolate(c * 1.5, c * 4, k.v)
+            el.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg)`
+            el.style.zIndex = String(sheets.length - i)
+          })
+        }
+        place()
+        gsap.to(k, { v: 1, ease: 'none', onUpdate: place, scrollTrigger: { trigger: deck, start: 'top 85%', end: 'center 55%', scrub: 0.5, invalidateOnRefresh: true } })
+        return () => { deck.classList.remove('fan'); sheets.forEach((el) => { el.style.transform = ''; el.style.zIndex = '' }) }
       })
-      mm.add('(prefers-reduced-motion: reduce)', () => draw(1))
     }, root)
     document.fonts.ready.then(() => ScrollTrigger.refresh())
     return () => ctx.revert()
-  }, [])
+  }, [still])
+
+  // com movimento reduzido, o grupo da etapa aparece pousado, sem queda
+  useEffect(() => { if (still) fall.p = beat + 1 }, [beat, still])
 
   // a legenda nova entra antes de ser lida
   useLayoutEffect(() => {
@@ -166,21 +181,38 @@ export default function Landing({ onStart }: { onStart: () => void }) {
     return () => { tw.kill() }
   }, [shown, still])
 
+  // leitor do relatório: trava a página, abre na folha clicada e fecha com Esc
+  const scale = Math.min(1, (innerWidth - 48) / PAGE_W)
+  useLayoutEffect(() => {
+    if (reading == null) return
+    const html = document.documentElement
+    html.style.overflow = 'hidden'
+    reader.current!.scrollTop = reading * (PAGE_H * scale + STEP_GAP) + READER_PAD - 16 // a folha abre rente ao topo
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setReading(null) }
+    window.addEventListener('keydown', onKey)
+    return () => { html.style.overflow = ''; window.removeEventListener('keydown', onKey) }
+  }, [reading, scale])
+
+  const onPhoto = useCallback((url: string) => { setPhoto(url); setWantPhoto(false) }, [])
   const start = (e?: MouseEvent) => {
     e?.preventDefault()
     if (still) return onStart()
     gsap.to(root.current, { opacity: 0, duration: 0.22, ease: 'power1.in', onComplete: onStart })
   }
-  const skip = () => document.querySelector('.lp-steps')?.scrollIntoView({ behavior: still ? 'auto' : 'smooth' })
-  const box = { top: inset.top, right: inset.right, bottom: inset.bottom, left: inset.left }
-  const plan = <div className="lp-fallback" style={box}><Plan items={SHOW} sea /></div>
+  const go = (sel: string) => document.querySelector(sel)?.scrollIntoView({ behavior: still ? 'auto' : 'smooth' })
+  const openSheet = (e: MouseEvent) => {
+    const w = (e.target as HTMLElement).closest('.sheet-wrap')
+    if (w) setReading([...w.parentElement!.children].indexOf(w))
+  }
+  const plan = <div className="lp-fallback" style={{ top: inset.top, right: inset.right, bottom: inset.bottom, left: inset.left }}><Plan items={SHOW} sea /></div>
+  const report = <ReportSheets name={MODEL.name} spec={MODEL.spec!} photo={photo} ev={EV} biz={BIZ} />
 
   return (
     <div className="lp" ref={root}>
       <div className="lp-canvas" aria-hidden="true">
         {webgl ? (
           <Suspense fallback={plan}>
-            <Showcase stage={beat} turn={beat >= 3 && !still ? 1 : 0} inset={inset} paused={paused} still={still} />
+            <Showcase beat={beat} inset={inset} paused={paused} still={still} wantPhoto={wantPhoto} onPhoto={onPhoto} />
           </Suspense>
         ) : plan}
       </div>
@@ -200,7 +232,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
           <p className="lp-desc rise">Responda oito perguntas e veja o resort se montar em 3D, num terreno de 4 hectares. O relatório sai em folhas A4, com investimento, operação e retorno em 10 anos.</p>
           <div className="lp-ctas rise">
             <a className="lp-btn" href="#builder" onClick={start}>Começar meu projeto</a>
-            <button className="lp-btn ghost" onClick={() => document.querySelector('.lp-build')?.scrollIntoView({ behavior: still ? 'auto' : 'smooth' })}>Ver a obra</button>
+            <button className="lp-btn ghost" onClick={() => go('.lp-build')}>Ver os números</button>
           </div>
           <div className="lp-hero-nums rise">
             <div><b>{EV.keys}</b><span>UHs</span></div>
@@ -211,78 +243,44 @@ export default function Landing({ onStart }: { onStart: () => void }) {
         </div>
       </section>
 
-      <section className="lp-build" aria-label="A obra, etapa por etapa">
+      <section className="lp-build" aria-label="O negócio do exemplo, etapa por etapa">
         <div className="lp-stick">
           <div className="lp-beat">
             <div className="lp-count">
               <div className="nm"><b>{String(shown + 1).padStart(2, '0')}</b><i>/{String(BEATS.length).padStart(2, '0')}</i></div>
-              <div className="lp-prog">{BEATS.map((b, i) => <span key={b.title} className={i === shown ? 'cur' : i < shown ? 'done' : ''} />)}</div>
+              <div className="lp-prog">{BEATS.map((x, i) => <span key={x.title} className={i === shown ? 'cur' : i < shown ? 'done' : ''} />)}</div>
             </div>
             <div className="cap" ref={cap} key={shown}>
-              <h2>{BEATS[shown].title}</h2>
-              <p>{BEATS[shown].text}</p>
+              <h2>{b.title}</h2>
+              <p className="lp-lead">{b.lead}</p>
+              <div className="lp-live">
+                {b.kpis.map(([v, l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}
+              </div>
+              {b.chart && <MiniCash />}
             </div>
-            <div className="lp-live">
-              <div><Tween value={facts.keys} format={fmtInt} still={still} /><span>UHs</span></div>
-              <div><Tween value={facts.cost / 1e6} format={fmtMi} still={still} /><span>R$ mi de obra</span></div>
-              <div><b>{facts.tier ?? 'Sem categoria'}</b><span>Categoria</span></div>
-            </div>
-            <button className="lp-skip" onClick={skip}>Pular a obra</button>
+            <button className="lp-skip" onClick={() => go('.lp-questions')}>Pular para as perguntas</button>
           </div>
         </div>
       </section>
 
-      <section className="lp-steps">
-        <h2 className="lp-h2">Oito perguntas, um checklist e <span className="hl">seis folhas A4</span>.</h2>
-        <p className="lp-lede">O Builder monta o programa de necessidades a cada resposta e implanta tudo no terreno com o motor de posicionamento. Você revisa o escopo e leva o estudo pronto.</p>
-        <div className="lp-cards">
-          {STEPS.map((s, i) => (
-            <article key={s.title} className="lp-card">
-              <span className="plane" aria-hidden="true" />
-              <div className="face">
-                <span className="quad">{i + 1}</span>
-                <h3>{s.title}</h3>
-                <p>{s.text}</p>
-              </div>
-            </article>
+      <section className="lp-questions">
+        <h2 className="lp-h2">Perguntas que visam <span className="hl">o futuro</span></h2>
+        <p className="lp-lede">Sete perguntas de negócio, mais o nome do projeto. Cada resposta muda o hotel no mapa e as contas na hora. No fim, um checklist de escopo confirma o que entra no investimento.</p>
+        <ol className="lp-qs">
+          {QUESTIONS.map((q, i) => (
+            <li key={q.q} className="lp-q">
+              <span className="quad">{i + 1}</span>
+              <div><h3>{q.q}</h3><p>{q.why}</p></div>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
-      <section className="lp-numbers">
-        <h2 className="lp-h2">{BIZ.payback != null ? <>O exemplo paga a obra em <em>{num(BIZ.payback, 1)} anos</em>.</> : 'O exemplo, em números.'}</h2>
-        <p className="lp-lede">{MODEL.name}, com {EV.keys} UHs para famílias. Investimento completo, sem terreno. Valores reais, sem inflação e sem financiamento.</p>
-        <div className="lp-kpis">
-          {KPIS.map((k) => (
-            <div key={k.label}>
-              <span className="lp-lb">{k.label}</span>
-              <div className="fig"><b data-v={k.value} data-d={k.d}>{num(k.value, k.d)}</b><i>{k.unit}</i></div>
-              <p>{k.text}</p>
-            </div>
-          ))}
-        </div>
-        <div className="lp-cash">
-          <span className="lp-lb">Caixa acumulado, da obra ao ano 10</span>
-          <Cash />
-        </div>
-      </section>
-
-      <section className="lp-plans">
-        <h2 className="lp-h2">Três desenhos de implantação, <span className="hl">vistos em resorts reais</span>.</h2>
-        <p className="lp-lede">O motor posiciona cada peça por zona, vizinhança e ruído, vira a fachada para onde faz sentido e liga os acessos por caminhos de 3 a 7 blocos.</p>
-        <div className="lp-cards lp-plan-grid">
-          {PLANS.map((p) => (
-            <article key={p.id} className="lp-card">
-              <span className="plane" aria-hidden="true" />
-              <div className="face">
-                <TemplatePlan t={p.id} className="lp-plan" />
-                <h3>{p.name}</h3>
-                <p>{p.text}</p>
-                <p className="refs">{p.refs}</p>
-              </div>
-            </article>
-          ))}
-        </div>
+      <section className="lp-report">
+        <h2 className="lp-h2">O estudo sai em <span className="hl">seis folhas A4</span>.</h2>
+        <p className="lp-lede">Este é o relatório do exemplo, gerado pelo Builder: a capa com a fachada, o hotel em números, a operação, o caixa em 10 anos, valor e risco, e as premissas. Clique numa folha para ler.</p>
+        <div className="sheets lp-deck" style={{ '--s': 0.38 } as CSSProperties} onClick={openSheet}>{report}</div>
+        <button className="lp-btn ghost lp-read" onClick={() => setReading(0)}>Ler o relatório do exemplo</button>
       </section>
 
       <section className="lp-cta">
@@ -296,6 +294,15 @@ export default function Landing({ onStart }: { onStart: () => void }) {
       <footer className="lp-foot">
         <p>Simulação para comparar cenários, não um estudo de viabilidade. Fontes: Panorama da Hotelaria Brasileira 2026 (HotelInvest e FOHB), JLL, HVS, ABIH-SP, Resorts Brasil, CUB Sinduscon-SP e SINAPI.</p>
       </footer>
+
+      {reading != null && (
+        <div className="lp-viewer" role="dialog" aria-modal="true" aria-label="Relatório do exemplo" onClick={() => setReading(null)}>
+          <button className="lp-btn lp-viewer-close" onClick={() => setReading(null)}>Fechar</button>
+          <div className="lp-viewer-scroll" ref={reader} onClick={(e) => e.stopPropagation()}>
+            <div className="sheets" style={{ '--s': scale } as CSSProperties}>{report}</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

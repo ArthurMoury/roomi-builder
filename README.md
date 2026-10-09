@@ -66,14 +66,13 @@ No destino praia, o mar é um bloco de maquete encostado na divisa de água do m
 
 Segue as notas do cofre sobre rolagem e GSAP: a rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com `position: sticky` e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido.
 
-1. **Abertura**: título em três linhas, como a capa dos PDFs, e o terreno em 3D ao lado.
-2. **A obra**: o resort de exemplo sobe em quatro etapas (chegada, hospedagem, lazer e paisagismo), com UHs, obra e categoria ao vivo. Na última etapa o board gira 90°. "Pular a obra" leva adiante.
-3. **Como funciona**: questionário, checklist e relatório A4, em cartões com o plano de meio-tom atrás.
-4. **O exemplo em números**: investimento, TIR, EBITDA por mês e ocupação de equilíbrio, e o caixa acumulado que se desenha com a rolagem.
-5. **Três desenhos de implantação**: as zonas de cada modelo em planta, com os resorts reais de referência.
-6. **Chamada final** no coral da contracapa, com o chapéu.
+1. **Abertura**: título em três linhas, como a capa dos PDFs, e os elementos do resort caindo do céu, cada um sobre a sua placa do board (sem o board inteiro).
+2. **O negócio do exemplo** em quatro etapas: investimento, receita, operação e retorno, com os números do motor. A cada etapa, um grupo novo de elementos cai do céu enquanto o anterior segue caindo até sumir. A posição é função da rolagem, então voltar desfaz. O retorno desenha o caixa em 10 anos. "Pular para as perguntas" leva adiante.
+3. **Perguntas que visam o futuro**: as sete perguntas de negócio do questionário e o que cada uma muda.
+4. **O relatório**: as seis folhas A4 do exemplo, com a fachada fotografada pelo próprio 3D, saem da pilha e abrem em leque com a rolagem (no celular, uma fila para deslizar). Um clique numa folha abre o leitor nela.
+5. **Chamada final** no coral da contracapa, com o chapéu.
 
-Todos os números da LP saem do motor, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, a obra aparece pronta e nada anima.
+Todos os números da LP saem do motor, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, cada etapa mostra o seu grupo já pousado e nada anima.
 
 ## Cálculo (`src/lib/valuation.ts`)
 

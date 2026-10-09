@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { createPortal, useThree } from '@react-three/fiber'
 import { ITEM_BY_ID } from '../data/catalog'
@@ -140,27 +140,17 @@ export function Thumbs() {
   )
 }
 
-// Fachada do hotel para o relatório: o mapa atual montado numa cena à parte (sem animação de obra,
-// sem moldura de seleção) e fotografado de frente, pela chegada
-export function FrontPhoto() {
+// Fachada de um layout, montado numa cena à parte (sem animação de obra) e fotografado de frente,
+// pela chegada. Devolve a imagem uma vez por lista de itens.
+export function PhotoOf({ items, onShot }: { items: SketchItem[]; onShot: (url: string) => void }) {
   const gl = useThree((s) => s.gl)
-  const req = useStore((s) => s.photoReq)
-  const [items, setItems] = useState<SketchItem[] | null>(null)
   const scene = useMemo(() => new THREE.Scene(), [])
   const camera = useMemo(() => new THREE.PerspectiveCamera(30, 1, 0.1, 500), [])
   const target = useMemo(() => makeTarget(PHOTO_SIZE), [])
   useEffect(() => () => target.dispose(), [target])
   useEffect(() => {
-    if (!req) return
-    const { placed, dying } = useStore.getState()
-    setItems(placed.filter((p) => !dying.has(p.uid)).map((p) => ({ id: p.itemId, x: p.x, z: p.z, rot: p.rot })))
-  }, [req])
-  useEffect(() => {
-    if (!items) return
-    useStore.setState({ photo: shoot(gl, scene, camera, target, { size: PHOTO_SIZE, view: FRONT_VIEW, fill: 0.47, dots: 0.9 }) })
-    setItems(null)
-  }, [items, gl, scene, camera, target])
-  if (!items) return null
+    onShot(shoot(gl, scene, camera, target, { size: PHOTO_SIZE, view: FRONT_VIEW, fill: 0.47, dots: 0.9 }))
+  }, [items, onShot, gl, scene, camera, target])
   return createPortal(
     <>
       <Lights />
@@ -168,4 +158,17 @@ export function FrontPhoto() {
     </>,
     scene,
   )
+}
+
+// Fachada do hotel para o relatório: o mapa atual, a cada pedido de relatório
+export function FrontPhoto() {
+  const req = useStore((s) => s.photoReq)
+  const [items, setItems] = useState<SketchItem[] | null>(null)
+  useEffect(() => {
+    if (!req) return
+    const { placed, dying } = useStore.getState()
+    setItems(placed.filter((p) => !dying.has(p.uid)).map((p) => ({ id: p.itemId, x: p.x, z: p.z, rot: p.rot })))
+  }, [req])
+  const done = useCallback((photo: string) => { useStore.setState({ photo }); setItems(null) }, [])
+  return items ? <PhotoOf items={items} onShot={done} /> : null
 }
