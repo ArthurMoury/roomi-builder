@@ -7,8 +7,7 @@ import { Entry } from './Entry'
 import { Plan } from './Plan'
 import { BIZ, EV, MODEL, SHOW } from './example'
 import { fall } from './motion'
-import { figure, pct, years } from '../lib/range'
-import { Fig } from '../ui/ReportSheets'
+import { pct, years } from '../lib/range'
 import './landing.css'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -280,12 +279,13 @@ export default function Landing({ onStart }: { onStart: () => void }) {
             <a className="lp-btn" href="#builder" onClick={start}>Começar meu projeto</a>
             <button className="lp-btn ghost" onClick={() => go('.lp-build')}>Ver como funciona</button>
           </div>
+          {/* o que o Maker entrega, sem estimativa nenhuma: as respostas, o horizonte e o estudo */}
           <div className="lp-hero-nums rise">
-            <div><b>{EV.keys}</b><span>UHs</span></div>
-            <div><b><Fig text={figure(BIZ.r.investment, 1e6)} /></b><span>R$ mi de investimento</span></div>
-            <div><b><Fig text={figure(BIZ.r.irr, 0.01, 0.01)} /></b><span>% de TIR real</span></div>
+            <div><b>8</b><span>respostas</span></div>
+            <div><b>10</b><span>anos projetados</span></div>
+            <div><b>6</b><span>folhas A4</span></div>
           </div>
-          <p className="lp-note rise">Exemplo: {MODEL.name.toLowerCase()}, montado no Maker.</p>
+          <p className="lp-note rise">Do terreno ao retorno, num estudo só.</p>
         </div>
         <div className="lp-door" ref={frame} aria-hidden="true" />
         </div>

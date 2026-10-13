@@ -6,10 +6,11 @@ import { useEffect, useRef, type RefObject } from 'react'
 // deslocado atrás da parede (plano atrás de plano).
 // - Ao carregar, as camadas vêm do fundo e se assentam, cada uma na sua profundidade.
 // - Parada, uma onda de luz caminha pelo meio-tom dos degraus e o L coral sobe e desce como porta de
-//   elevador. Com o mouse, as camadas andam em paralaxe pela profundidade e os pontos incham perto dele.
-// - Com a rolagem (a abertura fica presa por uma tela), a câmera entra pela porta: cada camada cresce em
-//   volta do ponto de fuga no vão, a de perto mais rápido que a do fundo, e os pontos crescem como lupa
-//   sobre a impressão. No fim tudo some no escuro da página: a pessoa entrou.
+//   elevador. O mouse não mexe na cena: ela só muda sozinha e com a rolagem.
+// - Com a rolagem (a abertura fica presa por uma tela), a câmera entra pelo vão escuro da porta: cada
+//   camada cresce em volta do ponto de fuga, a de perto mais rápido que a do fundo, e passa da câmera;
+//   os pontos do vão crescem como lupa até se fundirem num escuro só. A tela termina preta, e os passos
+//   começam no mesmo fundo.
 
 const ART = 1214
 const TAU = Math.PI * 2
@@ -23,8 +24,16 @@ const MOLDURA: Pt[] = [[460, 142], [1015, 142], [1015, 833], [460, 833]]
 const VERGA: Pt[] = [[460, 142], [765, 142], [765, 300], [563, 300], [563, 833], [460, 833]]
 const MASSA: Pt[] = [[0, 993], [460, 993], [460, 833], [1015, 833], [1015, 993], [1214, 993], [1214, 1214], [0, 1214]]
 const VAO: Pt[] = [[765, 386], [912, 386], [912, 833], [563, 833], [563, 700], [765, 700]]
-const FUGA: Pt = [963, 600] // o vão aberto da porta, à direita do L
+// as mesmas formas em retângulos (todas são retas): o recorte por retângulo não vira máscara, então a
+// retícula continua barata com a câmera bem perto
+type Rect = [number, number, number, number]
+const VAO_R: Rect[] = [[765, 386, 912, 700], [563, 700, 912, 833]]
+const VERGA_R: Rect[] = [[460, 142, 765, 300], [460, 300, 563, 833]]
+const MASSA_R: Rect[] = [[0, 993, 1214, 1214], [460, 833, 1015, 993]]
+const FUGA: Pt = [838, 543] // o meio do vão escuro, à direita do L: é por ali que a câmera entra
 const STEP = 32             // passo da retícula
+const DOOR = 1.45           // distância do vão: a câmera anda até ele ficar do tamanho da tela inteira
+const ZOOM = 30             // quanto o vão cresce até o fim da abertura presa (cobre qualquer tela)
 
 function trace(ctx: CanvasRenderingContext2D, pts: Pt[]) {
   ctx.beginPath()
@@ -39,68 +48,70 @@ function plane(ctx: CanvasRenderingContext2D, pts: Pt[], fill: string | null, lw
   if (lw > 0) { ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.lineJoin = 'miter'; ctx.stroke() }
 }
 
-// Meio-tom: grade de pontos tinta sobre o papel creme, recortada pelo polígono, num caminho só. Raio
-// acima de meio passo funde os pontos e a área vira negativo (fundo cheio com furos em losango).
-function dots(ctx: CanvasRenderingContext2D, pts: Pt[], radius: (x: number, y: number) => number) {
-  ctx.save()
-  trace(ctx, pts)
-  ctx.fillStyle = CREAM
-  ctx.fill()
-  ctx.clip()
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
-  for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y) }
+// Meio-tom: grade de pontos tinta sobre o papel creme, recortada retângulo a retângulo, num caminho só
+// por retângulo. Raio acima de meio passo funde os pontos e a área vira negativo (fundo cheio com furos
+// em losango); a partir de 0,71 do passo os furos fecham e a área fica toda escura (aí vira um
+// preenchimento só). Cada passada desenha os pontos que tocam o seu retângulo, então não há costura.
+function dots(ctx: CanvasRenderingContext2D, rects: Rect[], radius: (x: number, y: number) => number, solid = false) {
   // só os pontos que caem na tela: com a câmera entrando, cada ponto fica enorme e quase todos saem do quadro
   const inv = ctx.getTransform().inverse()
   const { width: cw, height: ch } = ctx.canvas
   const seen = [[0, 0], [cw, 0], [0, ch], [cw, ch]].map(([x, y]) => inv.transformPoint(new DOMPoint(x, y)))
-  x0 = Math.max(x0, Math.min(...seen.map((q) => q.x)) - STEP)
-  x1 = Math.min(x1, Math.max(...seen.map((q) => q.x)) + STEP)
-  y0 = Math.max(y0, Math.min(...seen.map((q) => q.y)) - STEP)
-  y1 = Math.min(y1, Math.max(...seen.map((q) => q.y)) + STEP)
-  ctx.fillStyle = INK
-  ctx.beginPath()
-  for (let y = Math.floor(y0 / STEP) * STEP + STEP / 2; y < y1 + STEP; y += STEP)
-    for (let x = Math.floor(x0 / STEP) * STEP + STEP / 2; x < x1 + STEP; x += STEP) {
-      const r = radius(x, y)
-      if (r > 0.4) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU) }
+  const vx0 = Math.min(...seen.map((q) => q.x)), vx1 = Math.max(...seen.map((q) => q.x))
+  const vy0 = Math.min(...seen.map((q) => q.y)), vy1 = Math.max(...seen.map((q) => q.y))
+  for (const [rx0, ry0, rx1, ry1] of rects) {
+    const x0 = Math.max(rx0, vx0) - STEP, x1 = Math.min(rx1, vx1) + STEP
+    const y0 = Math.max(ry0, vy0) - STEP, y1 = Math.min(ry1, vy1) + STEP
+    if (x0 > x1 || y0 > y1) continue
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(rx0, ry0, rx1 - rx0, ry1 - ry0)
+    ctx.fillStyle = solid ? INK : CREAM
+    ctx.fill()
+    if (!solid) {
+      ctx.clip()
+      ctx.fillStyle = INK
+      ctx.beginPath()
+      for (let y = Math.floor(y0 / STEP) * STEP + STEP / 2; y < y1 + STEP; y += STEP)
+        for (let x = Math.floor(x0 / STEP) * STEP + STEP / 2; x < x1 + STEP; x += STEP) {
+          const r = radius(x, y)
+          if (r > 0.4) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU) }
+        }
+      ctx.fill()
     }
-  ctx.fill()
-  ctx.restore()
+    ctx.restore()
+  }
 }
 
-interface Ui { px: number; py: number; cx: number; cy: number; focus: number }
-
 // Desenha a cena. travel: quanto a câmera andou porta adentro (negativo: as camadas ainda vêm do
-// fundo); fade: quanto já sumiu no fim da entrada; s: pixels de tela por unidade da arte
-function draw(ctx: CanvasRenderingContext2D, s: number, t: number, travel: number, fade: number, ui: Ui) {
+// fundo); dark: quanto o vão já fechou no escuro; out: quanto o resto da cena já se apagou na entrada
+// (só o vão escuro fica); alpha: a cena aparecendo ao carregar; s: pixels de tela por unidade da arte
+function draw(ctx: CanvasRenderingContext2D, s: number, t: number, travel: number, dark: number, out: number, alpha: number) {
   const [FX, FY] = FUGA
-  const alpha = 1 - fade
   if (alpha <= 0.002) return
-  const lens = (x: number, y: number) => (ui.focus > 0.01 ? ui.focus * Math.exp(-((x - ui.cx) ** 2 + (y - ui.cy) ** 2) / 50000) : 0)
-  // cada camada tem uma distância: cresce k = dist / (dist − travel) em volta do ponto de fuga e anda
-  // com o mouse pela profundidade (a do fundo contra o mouse, a da frente a favor)
-  const layer = (dist: number, paint: (lw: number) => void) => {
+  // cada camada tem uma distância: cresce k = dist / (dist − travel) em volta do ponto de fuga; a que a
+  // câmera já passou some
+  const layer = (dist: number, paint: (lw: number) => void, fade = out) => {
     const k = dist / (dist - travel)
-    if (!(k > 0) || k > 60) return
-    const depth = (2.2 - dist) / 1.15 * 2 - 1
+    if (!(k > 0) || k > 120 || fade >= 0.999) return
     ctx.save()
-    ctx.translate(FX + ui.px * 26 * depth, FY + ui.py * 18 * depth)
+    ctx.globalAlpha = alpha * (1 - fade)
+    ctx.translate(FX, FY)
     ctx.scale(k, k)
     ctx.translate(-FX, -FY)
     paint(1.4 / (s * k))
     ctx.restore()
   }
-  ctx.globalAlpha = alpha
-  // a parede, com o plano coral deslocado atrás
+  // a parede, com o plano coral deslocado atrás; fica até o fim, para o vão escuro crescer sobre ela
   layer(2.2, (lw) => {
     plane(ctx, QUADRO.map(([x, y]) => [x + 30, y + 30] as Pt), CORAL, lw)
     plane(ctx, QUADRO, CREAM, lw)
-  })
-  // o vão aberto da porta: meio-tom tão cheio que vira escuro com furos
+  }, 0)
+  // o vão aberto da porta: meio-tom tão cheio que vira escuro com furos; na entrada, os furos fecham
   layer(1.45, (lw) => {
-    dots(ctx, VAO, (x, y) => STEP * (0.62 + 0.25 * lens(x, y)))
+    dots(ctx, VAO_R, () => STEP * (0.62 + 0.12 * dark), dark >= 0.999)
     plane(ctx, VAO, null, lw)
-  })
+  }, 0)
   // o L coral sobe e desce como porta de elevador
   layer(1.4, (lw) => {
     const base = 748 + 34 * Math.sin((t * TAU) / 5)
@@ -109,21 +120,20 @@ function draw(ctx: CanvasRenderingContext2D, s: number, t: number, travel: numbe
   // a moldura e a verga, com a retícula que engrossa para baixo e para a esquerda
   layer(1.3, (lw) => {
     plane(ctx, MOLDURA, null, lw)
-    dots(ctx, VERGA, (x, y) => STEP * (0.34 * clamp01((770 - x) / 300 + (y - 300) / 520) + 0.3 * lens(x, y)))
+    dots(ctx, VERGA_R, (x, y) => STEP * 0.34 * clamp01((770 - x) / 300 + (y - 300) / 520))
     plane(ctx, VERGA, null, lw)
   })
   // os degraus: a retícula engrossa para a direita até virar negativo, com a onda de luz caminhando
   layer(1.05, (lw) => {
     const wave = (x: number) => 0.1 * Math.sin((t * TAU) / 6 - x / 170)
-    dots(ctx, MASSA, (x, y) => STEP * (0.3 + 0.4 * clamp01((x - 60) / 1000 + (y - 900) / 1400 + wave(x)) + 0.25 * lens(x, y)))
+    dots(ctx, MASSA_R, (x, y) => STEP * (0.3 + 0.4 * clamp01((x - 60) / 1000 + (y - 900) / 1400 + wave(x))))
     plane(ctx, MASSA, null, lw)
   })
-  ctx.globalAlpha = 1
 }
 
 // `frame` é o lugar da arte parada (a coluna da direita no desktop, o alto da tela no celular); o
 // canvas cobre a abertura inteira, para a entrada pela porta encher a tela. onGlow recebe a força do
-// brilho coral da sala (some junto com a cena no fim da entrada).
+// brilho coral da sala (some na entrada, que termina no escuro).
 export function Entry({ still, frame, onGlow }: { still: boolean; frame: RefObject<HTMLDivElement | null>; onGlow?: (v: number) => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const glow = useRef(onGlow)
@@ -132,22 +142,30 @@ export function Entry({ still, frame, onGlow }: { still: boolean; frame: RefObje
   useEffect(() => {
     const canvas = ref.current!
     const ctx = canvas.getContext('2d')!
-    const ui: Ui = { px: 0, py: 0, cx: -1e5, cy: -1e5, focus: 0 }
-    const aim = { px: 0, py: 0, focus: 0 }
     let fit = { s: 1, ox: 0, oy: 0, dpr: 1 }
     let t = still ? 1.2 : 0, intro = still ? 1 : 0
 
     const paint = () => {
-      // a entrada: a rolagem da abertura presa (uma tela) leva a câmera porta adentro
+      // a entrada: a rolagem da abertura presa (uma tela) leva a câmera pelo vão escuro da porta. O vão
+      // cresce por um fator constante a cada pedaço de rolagem (zoom uniforme), então qualquer rolagem
+      // mexe a cena; a moldura, o L e os degraus se apagam cedo, e o escuro do vão toma a parede creme
       const q = still ? 0 : clamp01(scrollY / innerHeight)
-      const z = smooth((q - 0.04) / 0.92)
-      const travel = 1.12 * z - 0.3 * (1 - smooth(intro))
-      const fade = smooth((z - 0.8) / 0.2)
+      const k = Math.exp((Math.min(q, 0.94) / 0.94) * Math.log(ZOOM))
+      const travel = DOOR * (1 - 1 / k) - 0.3 * (1 - smooth(intro))
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.setTransform(fit.dpr * fit.s, 0, 0, fit.dpr * fit.s, fit.dpr * fit.ox, fit.dpr * fit.oy)
-      draw(ctx, fit.s, t, travel, Math.max(fade, 1 - smooth(intro * 1.6)), ui)
-      glow.current?.((1 - smooth((q - 0.5) / 0.46)) * (0.6 + 0.4 * smooth(intro)))
+      draw(ctx, fit.s, t, travel, smooth((q - 0.3) / 0.45), smooth((q - 0.08) / 0.26), smooth(intro * 1.6))
+      // no fim da entrada a tela fica toda no escuro da página, em qualquer formato de tela
+      const night = smooth((q - 0.9) / 0.08)
+      if (night > 0) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.globalAlpha = night
+        ctx.fillStyle = INK
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.globalAlpha = 1
+      }
+      glow.current?.((1 - smooth((q - 0.2) / 0.5)) * (0.6 + 0.4 * smooth(intro)))
     }
     // a arte cabe no lugar dela (contain), nítida até densidade 2
     const resize = () => {
@@ -167,31 +185,12 @@ export function Entry({ still, frame, onGlow }: { still: boolean; frame: RefObje
     resize()
     if (still) return () => ro.disconnect()
 
-    const onMove = (e: PointerEvent) => {
-      if (e.pointerType !== 'mouse') return
-      const b = frame.current?.getBoundingClientRect()
-      if (!b) return
-      aim.px = Math.max(-1, Math.min(1, ((e.clientX - b.left) / b.width) * 2 - 1))
-      aim.py = Math.max(-1, Math.min(1, ((e.clientY - b.top) / b.height) * 2 - 1))
-      aim.focus = e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom ? 1 : 0
-      const own = canvas.getBoundingClientRect()
-      ui.cx = (e.clientX - own.left - fit.ox) / fit.s
-      ui.cy = (e.clientY - own.top - fit.oy) / fit.s
-    }
-    const onLeave = () => { aim.px = 0; aim.py = 0; aim.focus = 0 }
-    addEventListener('pointermove', onMove, { passive: true })
-    document.documentElement.addEventListener('pointerleave', onLeave)
-
     let raf = 0, last = 0, running = false
     const loop = (now: number) => {
       const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 0
       last = now
       t += dt
       intro = Math.min(1, intro + dt / 1.3)
-      const ease = 1 - Math.exp(-dt * 5)
-      ui.px += (aim.px - ui.px) * ease
-      ui.py += (aim.py - ui.py) * ease
-      ui.focus += (aim.focus - ui.focus) * ease
       paint()
       raf = requestAnimationFrame(loop)
     }
@@ -211,8 +210,6 @@ export function Entry({ still, frame, onGlow }: { still: boolean; frame: RefObje
       run(false)
       ro.disconnect()
       io.disconnect()
-      removeEventListener('pointermove', onMove)
-      document.documentElement.removeEventListener('pointerleave', onLeave)
       document.removeEventListener('visibilitychange', onVis)
     }
   }, [still, frame])
