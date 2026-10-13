@@ -34,6 +34,8 @@ const isItem = (v: unknown): v is SketchItem => {
 
 const pick = <T extends string>(v: unknown, ids: { id: T }[]) => (ids.some((o) => o.id === v) ? (v as T) : null)
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null)
+// ocupação em %: um arquivo com fração (0,65) vira 65; fora de 1 a 100, volta vazia
+const occ = (v: unknown) => { const n = num(v); if (n == null) return null; const p = n <= 1 ? n * 100 : n; return p >= 1 && p <= 100 ? p : null }
 
 // Campos do analista: o que não for válido volta vazio
 function readAnalysis(v: unknown): Analysis {
@@ -46,7 +48,7 @@ function readAnalysis(v: unknown): Analysis {
       destino: pick(s.destino, DESTINOS),
       categoria: pick(s.categoria, TIERS as { id: Spec['categoria'] & string }[]),
       publico: pick(s.publico, PUBLICOS),
-      uhs: num(s.uhs), adr: num(s.adr), ocupacao: num(s.ocupacao),
+      uhs: num(s.uhs), adr: num(s.adr), ocupacao: occ(s.ocupacao),
       orcamento: pick(s.orcamento, BUDGETS) ?? BUDGETS.find((b) => { const v = num(s.orcamento); return v != null && v >= b.min && v < b.max })?.id ?? null,
     },
     checks,

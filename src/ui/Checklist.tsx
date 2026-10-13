@@ -1,8 +1,8 @@
 import { motion } from 'motion/react'
 import { useStore } from '../store'
-import { money } from '../lib/valuation'
 import { answerScope } from '../lib/program'
-import type { Business } from '../lib/business'
+import { obraRange, type Business } from '../lib/business'
+import { brl } from '../lib/range'
 import { InvestRange } from './Counter'
 
 const pct = (v: number) => `${Math.round(v * 100)}%`
@@ -47,7 +47,7 @@ export function Checklist({ biz, onClose }: { biz: Business; onClose: () => void
           {biz.scope.map((c, i) => (
             <motion.li key={c.id} {...row(i)} className={c.yes ? '' : 'off'}>
               <span className="quad">{i + 1}</span>
-              <span className="q">{c.ask}<small>{c.onMap ? `no mapa · ${money(c.cost)}` : c.yes ? `sem espaço no mapa · ${money(c.delta)} estimado` : 'fora do mapa'}</small></span>
+              <span className="q">{c.ask}<small>{c.onMap ? `no mapa · ${brl(obraRange(c.cost))}` : c.yes ? `sem espaço no mapa · ${brl(obraRange(c.delta))}` : 'fora do mapa'}</small></span>
               <Toggle label={c.ask} yes={c.yes} onChange={(v) => answerScope(c.id, v)} />
             </motion.li>
           ))}
@@ -57,7 +57,7 @@ export function Checklist({ biz, onClose }: { biz: Business; onClose: () => void
           {biz.extras.map((e, i) => (
             <motion.li key={e.id} {...row(n + i)} className={e.yes ? '' : 'off'}>
               <span className="quad">{n + i + 1}</span>
-              <span className="q">{e.ask}<small>{pct(e.pct)} da obra · {money(e.value)}</small></span>
+              <span className="q">{e.ask}<small>{pct(e.pct)} da obra · {brl(obraRange(e.value))}</small></span>
               <Toggle label={e.ask} yes={e.yes} onChange={(v) => setCheck(e.id, v)} />
             </motion.li>
           ))}
@@ -68,7 +68,7 @@ export function Checklist({ biz, onClose }: { biz: Business; onClose: () => void
         <div className="ck-total">
           <span className="lb">Faixa de investimento</span>
           <b><InvestRange value={biz.investment} /></b>
-          <small>{biz.pending ? `${money(biz.pending)} ainda a confirmar` : 'tudo confirmado'}</small>
+          <small>{biz.pending ? `${brl(biz.r.pending)} ainda a confirmar` : 'tudo confirmado'}</small>
         </div>
         <div className="ck-actions">
           <button className="btn" onClick={onClose}>Voltar</button>

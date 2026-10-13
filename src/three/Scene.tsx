@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { animate, type JSAnimation } from 'animejs'
@@ -60,6 +60,21 @@ function buildIn(o: THREE.Object3D, delay: number): JSAnimation {
 
 const flashGeo = new THREE.PlaneGeometry(1, 1) // marcação da pegada, escalada para cada item
 
+// Juntar as peças de um item em poucas malhas custa alguns milissegundos. Numa troca grande, dezenas de
+// itens terminam a obra juntos: a fila faz as junções no máximo 6 ms por quadro, sem travar a animação.
+const merges: (() => void)[] = []
+let mergeFrame = 0
+function scheduleMerge(job: () => void) {
+  merges.push(job)
+  if (mergeFrame) return
+  const run = () => {
+    const end = performance.now() + 6
+    while (merges.length && performance.now() < end) merges.shift()!()
+    mergeFrame = merges.length ? requestAnimationFrame(run) : 0
+  }
+  mergeFrame = requestAnimationFrame(run)
+}
+
 export interface ItemProps {
   p: Placed
   delay: number    // espera na cascata, em ms (lida uma vez, ao montar)
@@ -103,11 +118,11 @@ function BuiltItem({ p, dying, links, onGone }: ItemProps) {
     anims.push(animate(flashMat, { opacity: [0, 0.55, 0], duration: 520 + maxStage * STEP, ease: 'outQuad' }))
     anims.push(animate(flash.current.scale, { x: [0.6 * w, w], y: [0.6 * d, d], duration: 380, ease: 'outBack' }))
     let alive = true
-    Promise.all(anims.map((a) => new Promise((done) => a.then(done)))).then(() => {
+    Promise.all(anims.map((a) => new Promise((done) => a.then(done)))).then(() => scheduleMerge(() => {
       if (!alive) return
       built.current = true
       setMerged(mergeItem(ref.current))
-    })
+    }))
     return () => { alive = false; anims.forEach((a) => a.cancel()) }
   }, [p.uid, flashMat, w, d])
   useEffect(() => () => { if (merged) disposeMerged(merged) }, [merged])
@@ -262,16 +277,28 @@ export function Rig() {
 
 export const DPR = Math.min(window.devicePixelRatio, 2) // nítido em telas de alta densidade, sem passar de 2
 
-const purge = (uid: string) => useStore.getState().purge(uid)
+// as demolições que terminam no mesmo quadro saem do mapa numa mudança só da loja
+const gone = new Set<string>()
+let purgeFrame = 0
+const purge = (uid: string) => {
+  gone.add(uid)
+  purgeFrame ||= requestAnimationFrame(() => {
+    purgeFrame = 0
+    const uids = [...gone]
+    gone.clear()
+    useStore.getState().purge(uids)
+  })
+}
 const turn = (side: -1 | 1) => { view.turn += side }
 
-function StoreItem({ p }: { p: Placed }) {
+// memo: quando o mapa muda, só o item que mudou re-renderiza (a peça é o mesmo objeto entre mudanças)
+const StoreItem = memo(function StoreItem({ p }: { p: Placed }) {
   const [delay] = useState(() => useStore.getState().delays[p.uid] ?? 0)
   const dying = useStore((s) => s.dying.has(p.uid))
   const link = !!ITEM_BY_ID[p.itemId].link
   const links = useStore((s) => (link ? linksOf(s.placed, s.dying, p) : ''))
   return <Item p={p} delay={delay} dying={dying} links={links} onGone={purge} />
-}
+})
 
 // O mar aparece quando o destino é praia, na divisa de água do modelo de implantação
 function StoreSea({ light }: { light: boolean }) {

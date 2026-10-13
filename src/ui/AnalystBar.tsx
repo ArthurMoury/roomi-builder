@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore } from '../store'
-import { TIERS, money, type Evaluation } from '../lib/valuation'
+import { TIERS, type Evaluation } from '../lib/valuation'
 import { BUDGETS, LAYOUT_FIELDS, MAX_UHS, type Spec } from '../lib/spec'
 import { rebuild } from '../lib/program'
-import type { Business } from '../lib/business'
+import { adrRange, type Business } from '../lib/business'
+import { brl } from '../lib/range'
 import { view } from '../three/view'
-import { Counter, InvestRange } from './Counter'
+import { InvestRange, RangeText } from './Counter'
 import { InfoIcon } from './icons'
 
 // Questionário que monta o hotel no mapa enquanto é respondido. Uma pergunta por vez; cada
@@ -72,7 +73,7 @@ const STEPS: Step[] = [
   },
   {
     key: 'categoria', kind: 'choice', label: 'Categoria', title: 'Em que categoria ele vai competir?', hint: 'Define o lazer obrigatório e a diária de referência.',
-    options: TIERS.map((t) => ({ id: t.id, label: t.id === 'ai' ? 'All Inclusive' : t.name, sub: `diária ${money(t.adr)}`, glyph: <Meter n={TIER_RANK[t.id]} /> })),
+    options: TIERS.map((t) => ({ id: t.id, label: t.id === 'ai' ? 'All Inclusive' : t.name, sub: `diária de ${brl(adrRange(t.adr))}`, glyph: <Meter n={TIER_RANK[t.id]} /> })),
   },
   { key: 'uhs', kind: 'number', label: 'UHs', title: 'Quantas UHs?', hint: 'Prédios, vagas, piscinas e restaurantes crescem junto.', min: 10, max: MAX_UHS, step: 10 },
   {
@@ -282,7 +283,14 @@ export function AnalystBar({ ev, biz }: { ev: Evaluation; biz: Business }) {
                   ) : (
                     <Dial key={s.key} s={s} value={valueOf(s.key, answers) as number | null} {...presetsOf(s)}
                       onChange={(v) => answer(s.key, v, s.key === 'uhs' ? 450 : 0)}
-                      onNext={(v) => { if (valueOf(s.key, { spec: useStore.getState().spec, name }) == null) answer(s.key, v, 40); advance(step) }}
+                      onNext={(v) => {
+                        if (valueOf(s.key, { spec: useStore.getState().spec, name }) == null) {
+                          // sem mexer no controle, a diária e a ocupação ficam as estimadas, que acompanham a categoria
+                          if (s.key === 'adr' || s.key === 'ocupacao') return skip(s.key)
+                          answer(s.key, v, 40)
+                        }
+                        advance(step)
+                      }}
                       onSkip={s.skip ? () => skip(s.key) : undefined} />
                   )}
                 </>
@@ -303,7 +311,7 @@ export function AnalystBar({ ev, biz }: { ev: Evaluation; biz: Business }) {
 
         <div className="q-side">
           <div className="out"><span className="lb">Faixa de investimento</span><b><InvestRange value={biz.investment} /></b></div>
-          <div className="out"><span className="lb">EBITDA por mês</span><b><Counter value={biz.ebitdaMonth} format={(v) => (v ? money(v) : '—')} /></b></div>
+          <div className="out"><span className="lb">EBITDA por mês</span><b><RangeText text={biz.ready ? brl(biz.r.ebitdaMonth) : '—'} /></b></div>
           <div className="q-actions">
             <button className="icon-btn" onClick={() => open('explain')} aria-label="Como calculamos" title="Como calculamos"><InfoIcon /></button>
             <button className="btn primary" onClick={() => open('checklist')} disabled={!biz.ready}>Escopo e relatório</button>

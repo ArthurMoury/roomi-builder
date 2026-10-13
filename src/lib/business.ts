@@ -1,11 +1,15 @@
 import { ITEM_BY_ID } from '../data/catalog'
 import { TIERS, type Evaluation, type Placed } from './valuation'
 import { BUDGETS, type Spec, type TierId } from './spec'
+import { around, exact, type Range } from './range'
 
 // Visão de negócios: o investimento confirmado pelo checklist e a operação do hotel projetada em
 // 10 anos, com os indicadores que um investidor de hotelaria pede: TRevPAR, GOP, EBITDA, yield on
 // cost, TIR, VPL, valor do ativo, ocupação de equilíbrio e sensibilidade. Valores reais (sem
-// inflação), em reais de hoje.
+// inflação), em reais de hoje, antes de impostos e sem financiamento.
+//
+// Nada sai cravado: cada estimativa vira uma faixa (ver INCERTEZA). Só o que a pessoa escolheu ou
+// digitou (UHs, diária e ocupação esperadas, faixa de orçamento e respostas do checklist) é exato.
 
 export interface ScopeItem {
   id: string
@@ -57,22 +61,11 @@ export const BY_TIER: Record<TierId, { other: number; gop: number; staff: number
   lux: { other: 0.8, gop: 0.33, staff: 1.8 },
 }
 
-// Faixa de investimento para mostrar enquanto o projeto é respondido: a estimativa com 10% para
-// cada lado, arredondada em degraus redondos. O valor exato só aparece no relatório.
-export function investRange(v: number) {
-  if (!v) return null
-  const step = v < 2e6 ? 0.1e6 : v < 20e6 ? 1e6 : v < 100e6 ? 5e6 : v < 500e6 ? 10e6 : 50e6
-  const mi = (x: number) => (x / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: x < 2e6 ? 1 : 0 })
-  const lo = Math.max(step, Math.floor((v * 0.9) / step) * step)
-  const hi = Math.max(lo + step, Math.ceil((v * 1.1) / step) * step)
-  return `R$ ${mi(lo)} a ${mi(hi)} mi`
-}
-
 export const ASSUME = {
   baseFee: 0.04,        // taxa básica de administração, % da receita total (HVS: 4–5%)
   incentiveFee: 0.1,    // taxa de incentivo, % do GOP (HVS: 10–15%)
-  ffe: 0.04,            // reserva de reposição de FF&E, % da receita total (contratos: 4–5%)
-  fixedCharges: 0.02,   // IPTU, seguros e encargos fixos, % da receita estabilizada (estimativa)
+  ffe: 0.04,            // reserva de reposição de FF&E, % da receita total (contratos: 4–5%); sai do caixa, abaixo do EBITDA
+  fixedCharges: 0.02,   // IPTU, seguros e encargos fixos, % da receita de referência (estimativa)
   fixedShare: 0.6,      // parte fixa dos custos operacionais: folha-base, manutenção (estimativa)
   capRate: 0.1,         // cap rate de saída (negócios recentes no Brasil: 8,8% a 12%)
   discount: 0.12,       // taxa de desconto real (estimativa: título IPCA+ mais prêmio de risco)
@@ -81,61 +74,96 @@ export const ASSUME = {
   sellCost: 0.02,       // custo de venda na saída
 }
 
+// Incerteza de cada estimativa, do lado ruim e do bom. Cada faixa combina os efeitos como
+// independentes (raiz da soma dos quadrados), em vez de empilhar todos os piores casos de uma vez.
+// A diária e a ocupação digitadas não variam.
+export const INCERTEZA = {
+  obra: [-0.08, 0.15] as const, // estimativa conceitual de obra: estouro é mais comum que economia
+  adr: 0.08,                    // diária estimada, para cada lado
+  occ: 0.04,                    // ocupação estimada, em pontos
+  gop: 0.02,                    // estrutura de custos da categoria (margem GOP), em pontos
+  other: 0.1,                   // receitas além da hospedagem, para cada lado
+  cap: 0.005,                   // cap rate de saída, em pontos
+  staff: 0.15,                  // empregos por UH, para cada lado
+}
+const U = INCERTEZA
+const n1 = (v: number) => (v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+export const INCERTEZA_TEXTO = `a obra (de ${n1(-U.obra[0])}% abaixo a ${n1(U.obra[1])}% acima), a diária estimada (${n1(U.adr)}% para cada lado), a ocupação estimada (${n1(U.occ)} p.p.), a margem (${n1(U.gop)} p.p.), as receitas extras (${n1(U.other)}%) e o cap rate (${n1(U.cap)} p.p.)`
+
+// faixa de um custo de obra (itens, áreas, custos fora da obra e o investimento, que é proporcional)
+export const obraRange = (v: number) => around(v, U.obra[0], U.obra[1])
+// faixa das referências de mercado de diária e ocupação
+export const adrRange = (v: number) => around(v, -U.adr, U.adr)
+export const occRange = (v: number): Range => ({ lo: Math.max(0, v - U.occ), hi: Math.min(1, v + U.occ), mid: v })
+
 export const DAYS_PER_MONTH = 365 / 12
+const once = <T,>(make: () => T) => { let v: T | undefined; return () => (v ??= make()) }
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 
-interface Base { keys: number; adr: number; occ: number; other: number; gop: number }
+interface Base {
+  keys: number
+  adr: number; occ: number        // diária e ocupação usadas: as digitadas ou as estimadas
+  refAdr: number; refOcc: number  // a operação de referência do hotel, que dimensiona os custos
+  other: number; gop: number; cap: number
+}
 
-// Um ano de operação na ocupação `occ`, com a diária multiplicada por `rate`. Os custos têm uma
-// parte fixa (medida na operação estabilizada) e uma parte por diária vendida; A&B e outras
-// receitas acompanham a ocupação, não a diária.
+// Um ano de operação na ocupação `occ`, com a diária multiplicada por `rate`. Os custos são os da
+// operação de referência do hotel (a diária estimada e a ocupação da categoria): uma parte fixa e
+// uma parte por diária vendida. Assim a diária e a ocupação esperadas mexem na margem, não no tamanho
+// da folha. A&B e outras receitas acompanham a ocupação, não a diária. O EBITDA vem antes da reserva
+// de FF&E, que sai do caixa.
 function operate(b: Base, occ: number, rate = 1) {
-  const nightsS = b.keys * 365 * b.occ
-  const revenueS = nightsS * b.adr * (1 + b.other)
-  const costS = revenueS * (1 - b.gop)
-  const fixed = costS * ASSUME.fixedShare
-  const perNight = nightsS ? (costS - fixed) / nightsS : 0
+  const nightsRef = b.keys * 365 * b.refOcc
+  const revenueRef = nightsRef * b.refAdr * (1 + b.other)
+  const costRef = revenueRef * (1 - b.gop)
+  const fixed = costRef * ASSUME.fixedShare
+  const perNight = nightsRef ? (costRef - fixed) / nightsRef : 0
   const nights = b.keys * 365 * occ
   const rooms = nights * b.adr * rate
-  const revenue = rooms + nights * b.adr * b.other
+  const revenue = rooms + nights * b.refAdr * b.other
   const gop = revenue - fixed - perNight * nights
-  const ebitda = gop - (ASSUME.baseFee + ASSUME.ffe) * revenue - ASSUME.incentiveFee * Math.max(gop, 0) - ASSUME.fixedCharges * revenueS
-  return { occ, rooms, revenue, gop, ebitda }
+  const ebitda = gop - ASSUME.baseFee * revenue - ASSUME.incentiveFee * Math.max(gop, 0) - ASSUME.fixedCharges * revenueRef
+  return { occ, rooms, revenue, gop, ebitda, cash: ebitda - ASSUME.ffe * revenue }
 }
 
 // Fluxo de caixa: obra no ano 0, operação com rampa nos anos 1–10 e venda pelo cap rate no fim
 function project(b: Base, investment: number, occShift = 0, rate = 1) {
-  const occ = Math.min(Math.max(b.occ + occShift, 0), 1)
+  const occ = clamp(b.occ + occShift, 0, 1)
   const ys = Array.from({ length: ASSUME.years }, (_, t) => operate(b, occ * (ASSUME.ramp[t] ?? 1), rate))
-  const exit = (operate(b, occ, rate).ebitda / ASSUME.capRate) * (1 - ASSUME.sellCost)
-  const cash = [-investment, ...ys.map((y, t) => y.ebitda + (t === ASSUME.years - 1 ? Math.max(exit, 0) : 0))]
-  return { ys, exit, cash }
+  const stable = operate(b, occ, rate)
+  const exit = (Math.max(stable.cash, 0) / b.cap) * (1 - ASSUME.sellCost)
+  const cash = [-investment, ...ys.map((y, t) => y.cash + (t === ASSUME.years - 1 ? exit : 0))]
+  return { ys, stable, exit, cash }
 }
 
 const npv = (cash: number[], r: number) => cash.reduce((v, c, t) => v + c / (1 + r) ** t, 0)
 
-// TIR por bisseção: a taxa que zera o VPL; null quando o projeto não se paga nem com a venda
+// TIR por bisseção: a taxa que zera o VPL. O teto sobe até o VPL trocar de sinal, então TIR alta não
+// vira "não se paga"; null só quando nenhuma taxa zera o VPL (o caixa nunca fica positivo).
 function irr(cash: number[]) {
-  let lo = -0.99, hi = 1.5
-  if (npv(cash, lo) * npv(cash, hi) > 0) return null
-  for (let k = 0; k < 90; k++) {
+  let lo = -0.99, hi = 1
+  if (npv(cash, lo) < 0) return null
+  while (npv(cash, hi) > 0 && hi < 1e3) hi *= 2
+  if (npv(cash, hi) > 0) return null
+  for (let k = 0; k < 60 && hi - lo > 1e-7; k++) {
     const mid = (lo + hi) / 2
-    if (npv(cash, lo) * npv(cash, mid) <= 0) hi = mid
-    else lo = mid
+    if (npv(cash, mid) > 0) lo = mid
+    else hi = mid
   }
   return (lo + hi) / 2
 }
 
 // Anos até o caixa da operação (sem a venda) cobrir o investimento
-function paybackOf(investment: number, ebitdas: number[], stable: number) {
+function paybackOf(investment: number, flows: number[], stable: number) {
   let left = investment
-  for (const [t, e] of ebitdas.entries()) {
-    if (e > 0 && left <= e) return t + left / e
-    left -= e
+  for (const [t, c] of flows.entries()) {
+    if (c > 0 && left <= c) return t + left / c
+    left -= c
   }
-  return stable > 0 ? ebitdas.length + left / stable : null
+  return stable > 0 ? flows.length + left / stable : null
 }
 
-// Ocupação em que o EBITDA zera (com a diária de hoje)
+// Ocupação em que o EBITDA zera, com a diária de hoje
 function breakEven(b: Base) {
   if (operate(b, 1).ebitda < 0) return null
   let lo = 0, hi = 1
@@ -145,6 +173,33 @@ function breakEven(b: Base) {
     else hi = mid
   }
   return hi
+}
+
+// Os botões de incerteza: o cenário central e cada incerteza sozinha, no lado ruim e no bom
+interface Knobs { obra: number; adr: number; occ: number; gop: number; other: number; cap: number }
+const MID: Knobs = { obra: 1, adr: 1, occ: 0, gop: 0, other: 1, cap: 0 }
+const SWINGS: [Knobs, Knobs][] = [
+  [{ ...MID, obra: 1 + U.obra[1] }, { ...MID, obra: 1 + U.obra[0] }],
+  [{ ...MID, adr: 1 - U.adr }, { ...MID, adr: 1 + U.adr }],
+  [{ ...MID, occ: -U.occ }, { ...MID, occ: U.occ }],
+  [{ ...MID, gop: -U.gop }, { ...MID, gop: U.gop }],
+  [{ ...MID, other: 1 - U.other }, { ...MID, other: 1 + U.other }],
+  [{ ...MID, cap: U.cap }, { ...MID, cap: -U.cap }],
+]
+
+// Faixa de uma medida: o valor central e, para cada incerteza, o quanto ela empurra para baixo e para
+// cima; os empurrões se combinam pela raiz da soma dos quadrados. Sem valor central, sem faixa.
+function spread<M>(mid: M, swings: [M, M][], get: (m: M) => number | null): Range | null {
+  const c = get(mid)
+  if (c == null || !Number.isFinite(c)) return null
+  let down = 0, up = 0
+  for (const [a, b] of swings) {
+    const vs = [get(a), get(b)].map((v) => (v == null || !Number.isFinite(v) ? c : v))
+    const lo = Math.min(...vs), hi = Math.max(...vs)
+    if (lo < c) down += (c - lo) ** 2
+    if (hi > c) up += (hi - c) ** 2
+  }
+  return { lo: c - Math.sqrt(down), hi: c + Math.sqrt(up), mid: c }
 }
 
 export function business(ev: Evaluation, live: Placed[], spec: Spec, checks: Record<string, boolean>) {
@@ -164,68 +219,125 @@ export function business(ev: Evaluation, live: Placed[], spec: Spec, checks: Rec
   const pending = extras.reduce((n, e) => n + (e.yes ? 0 : e.value), 0)
   const investment = obra + confirmed
 
-  // tarifa e ocupação: as esperadas pela pessoa, ou as de referência da categoria do mapa
+  // tarifa e ocupação: as esperadas pela pessoa, ou as estimadas para o hotel (diária da categoria ×
+  // mix de UHs × lazer, e a ocupação da categoria)
   const adrOwn = !!spec.adr && spec.adr > 0
   const occOwn = !!spec.ocupacao && spec.ocupacao > 0
   const adr = adrOwn ? spec.adr! : ev.adr
-  const occ = occOwn ? Math.min(spec.ocupacao!, 100) / 100 : ev.occ
+  const occ = occOwn ? clamp(spec.ocupacao!, 0, 100) / 100 : ev.occ
   const tier = ev.tier ? BY_TIER[ev.tier.id as TierId] : null
-  const b: Base = { keys: ev.keys, adr, occ, other: tier?.other ?? 0, gop: tier?.gop ?? 0 }
-  const ok = ev.keys > 0 && adr > 0 && occ > 0 && !!tier
+  const ok = ev.keys > 0 && adr > 0 && occ > 0 && !!tier && ev.adr > 0
 
-  const stable = operate(b, occ)
-  const run = project(b, investment)
-  const ebitdas = run.ys.map((y) => y.ebitda)
-  let cum = -investment
-  const years = run.ys.map((y, t) => {
-    cum += y.ebitda
-    return { t: t + 1, occ: y.occ, revenue: y.revenue, ebitda: y.ebitda, cum }
-  })
-  const rates = [0.9, 1, 1.1]
-  const shifts = [-0.1, 0, 0.1]
-  const be = ok ? breakEven(b) : null
+  // o modelo inteiro num cenário: o investimento acompanha a obra (os custos fora dela são fração dela)
+  const model = (k: Knobs) => {
+    const inv = investment * k.obra
+    const b: Base = {
+      keys: ev.keys,
+      adr: adrOwn ? adr : ev.adr * k.adr,
+      occ: occOwn ? occ : clamp(ev.occ + k.occ, 0.05, 1),
+      refAdr: ev.adr, refOcc: ev.occ,
+      other: (tier?.other ?? 0) * k.other, gop: (tier?.gop ?? 0) + k.gop, cap: ASSUME.capRate + k.cap,
+    }
+    const run = project(b, inv)
+    const s = run.stable
+    let cum = -inv
+    const years = run.ys.map((y, t) => {
+      cum += y.cash
+      return { t: t + 1, occ: y.occ, revenue: y.revenue, ebitda: y.ebitda, cash: y.cash, cum }
+    })
+    const be = breakEven(b)
+    const noi = s.cash
+    return {
+      b, inv, s, noi, years, exit: run.exit,
+      irr: irr(run.cash), npv: npv(run.cash, ASSUME.discount),
+      payback: paybackOf(inv, run.ys.map((y) => y.cash), noi),
+      breakEven: be, value: Math.max(noi, 0) / b.cap,
+      // o mesmo hotel nas faixas de diária e ocupação da grade de sensibilidade
+      grid: (rate: number, shift: number) => irr(project(b, inv, shift, rate).cash),
+    }
+  }
+  type Run = ReturnType<typeof model>
+  const mid = ok ? model(MID) : null
+  const swings = ok ? SWINGS.map(([a, b]) => [model(a), model(b)] as [Run, Run]) : []
+  const R = (get: (m: Run) => number | null) => (mid ? spread(mid, swings, get) : null)
+
   const available = ev.keys * 365
+  // grade de sensibilidade: diária −10%, base e +10% contra três ocupações; quando a ocupação está
+  // perto do teto (ou do chão), a grade anda para não repetir coluna
+  const rates = [0.9, 1, 1.1]
+  const shifts = occ > 0.9 ? [-0.2, -0.1, 0] : occ < 0.1 ? [0, 0.1, 0.2] : [-0.1, 0, 0.1]
+  // nas células, a diária e a ocupação são as da célula (SWINGS[1] e [2] ficam de fora); variam a
+  // obra, a margem, as receitas e o cap rate
+  const cellSwings = swings.filter((_, i) => i !== 1 && i !== 2)
+  const cell = (a: number, d: number) => (mid ? spread(mid, cellSwings, (m) => m.grid(a, d)) : null)
+
+  const jobsMid = ev.keys * (tier?.staff ?? 0)
+  const perKeyMarket = ev.tier?.costPerKey ?? 0
 
   return {
     scope, extras, obra, confirmed, pending, investment,
     adr, adrOwn, occ, occOwn,
     budget: BUDGETS.find((b) => b.id === spec.orcamento) ?? null,
     ready: ok,
-    // operação estabilizada (a partir do ano 3)
-    revpar: adr * occ,
-    trevpar: ok ? stable.revenue / available : 0,
-    revenueYear: ok ? stable.revenue : 0,
-    revenueMonth: ok ? stable.revenue / 12 : 0,
-    roomsShare: ok ? stable.rooms / stable.revenue : 0,
-    gopYear: ok ? stable.gop : 0,
-    gopMargin: tier?.gop ?? 0,
-    goppar: ok ? stable.gop / available : 0,
-    ebitdaYear: ok ? stable.ebitda : 0,
-    ebitdaMonth: ok ? stable.ebitda / 12 : 0,
-    ebitdaMargin: ok ? stable.ebitda / stable.revenue : 0,
-    jobs: Math.round(ev.keys * (tier?.staff ?? 0)),
-    // investimento, valor e retorno
-    perKey: ev.keys ? investment / ev.keys : 0,
-    marketPerKey: ev.tier?.costPerKey ?? 0,
-    yieldOnCost: ok && investment ? stable.ebitda / investment : 0,
-    value: ok ? Math.max(stable.ebitda, 0) / ASSUME.capRate : 0,
-    payback: ok ? paybackOf(investment, ebitdas, stable.ebitda) : null,
-    irr: ok ? irr(run.cash) : null,
-    npv: ok ? npv(run.cash, ASSUME.discount) : 0,
-    exit: ok ? run.exit : 0,
-    breakEven: be,
-    years: ok ? years : [],
-    sensitivity: {
-      rates, shifts,
-      irr: rates.map((a) => shifts.map((d) => (ok ? irr(project(b, investment, d, a).cash) : null))),
+    // faixas do investimento: a obra é estimativa conceitual (−8% a +15%)
+    r: {
+      obra: obraRange(obra),
+      confirmed: obraRange(confirmed),
+      pending: obraRange(pending),
+      investment: obraRange(investment),
+      perKey: ev.keys ? obraRange(investment / ev.keys) : null,
+      marketPerKey: perKeyMarket ? around(perKeyMarket, -0.15, 0.15) : null,
+      // operação estabilizada (a partir do ano 3)
+      adr: adrOwn ? exact(adr) : R((m) => m.b.adr),
+      occ: occOwn ? exact(occ) : R((m) => m.b.occ),
+      revpar: adrOwn && occOwn ? exact(adr * occ) : R((m) => m.b.adr * m.b.occ),
+      trevpar: R((m) => m.s.revenue / available),
+      revenueYear: R((m) => m.s.revenue),
+      revenueMonth: R((m) => m.s.revenue / 12),
+      gopYear: R((m) => m.s.gop),
+      gopMargin: R((m) => m.s.gop / m.s.revenue),
+      ebitdaYear: R((m) => m.s.ebitda),
+      ebitdaMonth: R((m) => m.s.ebitda / 12),
+      ebitdaMargin: R((m) => m.s.ebitda / m.s.revenue),
+      noiYear: R((m) => m.noi),
+      jobs: jobsMid ? around(jobsMid, -U.staff, U.staff) : null,
+      // investimento, valor e retorno
+      yieldOnCost: R((m) => m.noi / m.inv),
+      value: R((m) => m.value),
+      created: R((m) => m.value - m.inv),
+      payback: R((m) => m.payback),
+      irr: R((m) => m.irr),
+      npv: R((m) => m.npv),
+      exit: R((m) => m.exit),
+      breakEven: R((m) => m.breakEven),
+      safety: R((m) => (m.breakEven == null ? null : m.b.occ - m.breakEven)),
+      years: mid ? mid.years.map((_, t) => ({
+        t: t + 1,
+        cum: R((m) => m.years[t].cum)!,
+        ebitda: R((m) => m.years[t].ebitda)!,
+        occ: occOwn ? exact(mid.years[t].occ) : R((m) => m.years[t].occ)!,
+      })) : [],
     },
-    // o mesmo hotel em cada categoria de mercado: diária, ocupação e receita de hospedagem
-    tiers: TIERS.map((t) => ({
-      id: t.id, name: t.name, adr: t.adr, occ: t.occ,
-      revenueMonth: ev.keys * t.adr * t.occ * DAYS_PER_MONTH,
-      diff: adr ? t.adr - adr : 0,
+    // o cenário central, para os desenhos (curva de caixa, barras); nunca mostrado como número
+    mid: mid ? { years: mid.years, payback: mid.payback, irr: mid.irr, npv: mid.npv, noi: mid.noi, revenue: mid.s.revenue, rooms: mid.s.rooms } : null,
+    roomsShare: mid ? mid.s.rooms / mid.s.revenue : 0,
+    gopMarginRef: tier?.gop ?? 0,
+    // a grade custa dezenas de TIRs: só sai quando o relatório pede, e uma vez
+    sensitivity: once(() => ({
+      rates, shifts,
+      irr: rates.map((a) => shifts.map((d) => cell(a, d))),
+      mid: rates.map((a) => shifts.map((d) => (mid ? mid.grid(a, d) : null))),
     })),
+    // o mesmo hotel (mesmo mix de UHs e lazer) em cada categoria de mercado: diária e ocupação de
+    // referência, em faixa
+    tiers: TIERS.map((t) => {
+      const a = t.adr * ev.mixFactor * ev.bonus
+      return { id: t.id, name: t.name, adr: adrRange(a), occ: occRange(t.occ), revpar: around(a * t.occ, -U.adr, U.adr), mid: a }
+    }),
   }
 }
 
 export type Business = ReturnType<typeof business>
+
+// Faixa de investimento enquanto o projeto é respondido (a mesma do relatório)
+export const investRange = (v: number) => (v ? obraRange(v) : null)

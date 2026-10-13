@@ -2,7 +2,9 @@ import { useMemo } from 'react'
 import { motion } from 'motion/react'
 import { useStore } from '../store'
 import { MODELS, layoutOf, type ResortModel } from '../data/models'
-import { evaluate, money } from '../lib/valuation'
+import { evaluate } from '../lib/valuation'
+import { obraRange } from '../lib/business'
+import { brl } from '../lib/range'
 import { EMPTY_SPEC } from '../lib/spec'
 
 function openModel(m: ResortModel) {
@@ -17,7 +19,7 @@ export function Models({ onClose }: { onClose: () => void }) {
   const thumbs = useStore((s) => s.thumbs)
   const facts = useMemo(() => MODELS.map((m) => {
     const ev = evaluate(layoutOf(m).map((i, k) => ({ uid: String(k), itemId: i.id, x: i.x, z: i.z, rot: i.rot })))
-    return `${ev.keys} UHs · ${ev.tier?.name ?? '—'} · ${money(ev.cost)}`
+    return `${ev.keys} UHs · ${ev.tier?.name ?? '—'} · obra de ${brl(obraRange(ev.cost))}`
   }), [])
 
   return (

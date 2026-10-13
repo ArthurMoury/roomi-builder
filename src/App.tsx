@@ -6,7 +6,9 @@ import { BusinessReport } from './ui/BusinessReport'
 import { CalcExplainer } from './ui/CalcExplainer'
 import { Models } from './ui/Models'
 import { Checklist } from './ui/Checklist'
-import { useStore } from './store'
+import { sigOf, useStore } from './store'
+import { SavePrompt } from './ui/SavePrompt'
+import { useShallow } from 'zustand/react/shallow'
 import { evaluate } from './lib/valuation'
 import { business } from './lib/business'
 import { downloadSketch, parseSketch } from './lib/sketch'
@@ -24,10 +26,11 @@ const MoonIcon = () => (
   </svg>
 )
 
+const PROMPT_OFF = 'roomi-aviso-esboco' // "não mostrar novamente", guardado neste navegador
+const promptOff = () => { try { return localStorage.getItem(PROMPT_OFF) === 'off' } catch { return false } }
+
 // O app: o board 3D ao fundo, o questionário embaixo e o checklist ao lado do mapa, antes do relatório
 export default function App({ onHome }: { onHome: () => void }) {
-  const placed = useStore((s) => s.placed)
-  const dying = useStore((s) => s.dying)
   const name = useStore((s) => s.hotelName)
   const theme = useStore((s) => s.theme)
   const notice = useStore((s) => s.notice)
@@ -35,8 +38,14 @@ export default function App({ onHome }: { onHome: () => void }) {
   const explain = useStore((s) => s.explain)
   const spec = useStore((s) => s.spec)
   const checks = useStore((s) => s.checks)
-  const live = useMemo(() => placed.filter((p) => !dying.has(p.uid)), [placed, dying])
+  // o mapa vivo, comparado item a item: cada demolição que termina tira o item de `placed`, mas ele já
+  // estava fora do mapa vivo, então o app não re-renderiza e avaliação e negócio não são refeitos
+  const live = useStore(useShallow((s) => s.placed.filter((p) => !s.dying.has(p.uid))))
   const ev = useMemo(() => evaluate(live), [live])
+  // há trabalho por salvar quando já há respostas e o projeto mudou desde o último esboço salvo ou aberto
+  const savedSig = useStore((s) => s.savedSig)
+  const sig = useMemo(() => sigOf(name, spec, checks, live), [name, spec, checks, live])
+  const dirty = (!!name || Object.values(spec).some((v) => v != null)) && sig !== savedSig
   const biz = useMemo(() => business(ev, live, spec, checks), [ev, live, spec, checks])
   const [toast, setToast] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -87,7 +96,29 @@ export default function App({ onHome }: { onHome: () => void }) {
   const save = () => {
     const { spec, checks } = useStore.getState()
     notify(`Esboço salvo em ${downloadSketch(name, live, { spec, checks })}`)
+    useStore.getState().markSaved(sig)
   }
+
+  // Aviso para salvar o esboço: ao voltar para a apresentação e ao trocar de aba (o aviso fica esperando
+  // a volta). Fechando a aba, o navegador pergunta. "Agora não" vale até o projeto mudar de novo.
+  const [prompt, setPrompt] = useState<{ then?: () => void } | null>(null)
+  const later = useRef('')
+  const latest = useRef({ dirty, sig, open: false })
+  useEffect(() => { latest.current = { dirty, sig, open: !!prompt } })
+  useEffect(() => {
+    const onHide = () => {
+      const { dirty, sig, open } = latest.current
+      if (document.hidden && dirty && !open && later.current !== sig && !promptOff()) setPrompt({})
+    }
+    const onLeave = (e: BeforeUnloadEvent) => { if (latest.current.dirty && !promptOff()) e.preventDefault() }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('beforeunload', onLeave)
+    return () => { document.removeEventListener('visibilitychange', onHide); window.removeEventListener('beforeunload', onLeave) }
+  }, [])
+  const goHome = () => (dirty && !promptOff() ? setPrompt({ then: onHome }) : onHome())
+  const closePrompt = () => { const then = prompt?.then; setPrompt(null); then?.() }
+  const onLater = () => { later.current = sig; closePrompt() }
+  const onNever = () => { try { localStorage.setItem(PROMPT_OFF, 'off') } catch { /* armazenamento indisponível */ } closePrompt() }
 
   const open = async (file: File | undefined) => {
     if (!file) return
@@ -108,7 +139,7 @@ export default function App({ onHome }: { onHome: () => void }) {
 
       <motion.header className="panel topbar" initial={{ y: -80, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 160, damping: 22, delay: 0.2 }}>
-        <button className="brand" onClick={onHome} aria-label="Roomi Maker, voltar à apresentação">
+        <button className="brand" onClick={goHome} aria-label="Roomi Maker, voltar à apresentação">
           <span className="logo" aria-hidden="true" /><span>Maker</span>
         </button>
         <span className={`project ${name ? '' : 'empty'}`}>{name || 'Novo projeto'}</span>
@@ -122,7 +153,7 @@ export default function App({ onHome }: { onHome: () => void }) {
           </AnimatePresence>
         </button>
         <button className="btn" onClick={() => fileInput.current?.click()}>Abrir</button>
-        <button className="btn" onClick={save} disabled={!live.length}>Salvar esboço</button>
+        <button className="btn save" onClick={save} disabled={!live.length}>Salvar esboço</button>
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={(e) => open(e.target.files?.[0])} />
         <button className="btn" onClick={() => useStore.getState().openModal('models')}>Modelos</button>
         <button className="btn" onClick={() => useStore.getState().clear()}>Limpar</button>
@@ -163,6 +194,9 @@ export default function App({ onHome }: { onHome: () => void }) {
       </AnimatePresence>
       <AnimatePresence>
         {explain && <CalcExplainer key="explain" ev={ev} biz={biz} count={live.length} onClose={closeModal} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {prompt && <SavePrompt key="save" onSave={() => { save(); closePrompt() }} onLater={onLater} onNever={onNever} />}
       </AnimatePresence>
     </>
   )

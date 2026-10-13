@@ -6,8 +6,8 @@ import { useStore } from './store'
 // aplica o tema antes do primeiro quadro, sem piscar o escuro padrão do CSS
 document.documentElement.dataset.theme = useStore.getState().theme
 
-// A LP abre primeiro; o Builder fica em #builder (um link com #builder abre direto nele).
-// Cada um carrega à parte.
+// A LP abre primeiro; o Maker fica em #builder (um link com #builder abre direto nele). Cada um
+// carrega à parte. "Começar meu projeto" na LP abre o board sempre vazio.
 const Landing = lazy(() => import('./lp/Landing'))
 const Builder = lazy(() => import('./App'))
 const atBuilder = () => location.hash === '#builder'
@@ -28,7 +28,7 @@ function Root() {
     <Suspense fallback={null}>
       {builder
         ? <Builder onHome={() => { location.hash = '' }} />
-        : <Landing onStart={() => { location.hash = 'builder' }} />}
+        : <Landing onStart={() => { useStore.getState().reset(); location.hash = 'builder' }} />}
     </Suspense>
   )
 }

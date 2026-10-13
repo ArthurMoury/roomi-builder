@@ -1,5 +1,7 @@
-/* LP do Maker. Peça expressiva da marca: escala Editorial e repetição, só nas três cores, sem
-   sombra e sem degradê. A página rola no documento (o app trava o body). */
+/* LP do Maker. Peça expressiva da marca: escala Editorial e repetição, só nas três cores e sem sombra.
+   A exceção é a abertura: a luz coral da porta tinge a sala num degradê, e o vidro (cofre: design ›
+   estilos › Glassmorphism, com camada de barreira) fica na barra do topo e no cartão dos números, onde
+   há cor atrás para desfocar. A página rola no documento (o app trava o body). */
 :root[data-view="lp"], :root[data-view="lp"] body, :root[data-view="lp"] #root { height: auto; }
 :root[data-view="lp"] { overflow-x: clip; }
 :root[data-view="lp"] body { overflow: visible; background: #1D1D1B; color: #F1E9E7; }
@@ -25,11 +27,23 @@
 .lp-btn.ink { background: #1D1D1B; color: #F1E9E7; border-color: #1D1D1B; }
 .lp-btn.ink:focus-visible { outline-color: #1D1D1B; }
 
-.lp-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--pad); background: #1D1D1B; border-bottom: 1px solid rgba(241, 233, 231, .12); }
+.lp-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--pad); background: rgba(29, 29, 27, .8); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); border-bottom: 1px solid rgba(249, 123, 85, .22); }
 .lp-nav .lp-btn { height: 38px; padding: 0 16px; font-size: 11.5px; }
 
-/* Abertura: título em três linhas como a capa dos PDFs, os elementos caindo à direita */
-.lp-hero { position: relative; z-index: 1; min-height: 100svh; display: grid; grid-template-columns: minmax(0, 45%) 1fr; padding: 64px var(--pad) 0; }
+/* Abertura: título em três linhas como a capa dos PDFs e a porta à direita. A sala é escura com um
+   respiro creme no alto e coral embaixo; o brilho coral atrás da porta (.lp-glow) acompanha o vão dela.
+   Opaca, ela cobre o 3D dos passos até começar a sair. */
+.lp-hero { position: relative; z-index: 1; isolation: isolate; min-height: 100svh; display: grid; grid-template-columns: minmax(0, 45%) 1fr; padding: 64px var(--pad) 0;
+  background:
+    radial-gradient(44% 38% at 6% 4%, rgba(241, 233, 231, .1), rgba(241, 233, 231, 0) 72%),
+    radial-gradient(58% 64% at 92% 34%, rgba(249, 123, 85, .26), rgba(249, 123, 85, 0) 72%),
+    radial-gradient(32% 24% at 22% 80%, rgba(249, 123, 85, .22), rgba(249, 123, 85, 0) 72%),
+    #1D1D1B; }
+.lp-glow { position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .75; will-change: opacity;
+  background: radial-gradient(46% 54% at 72% 54%, rgba(249, 123, 85, .66), rgba(249, 123, 85, .26) 44%, rgba(249, 123, 85, 0) 74%); }
+.lp-door { position: relative; min-height: 0; }
+.lp-door-art { position: absolute; left: 0; top: 40px; width: 100%; height: calc(100% - 76px); }
+@media (hover: hover) { .lp-door-art { cursor: pointer; } }
 .lp-hero .col { display: flex; flex-direction: column; justify-content: center; padding: 40px 0 44px; }
 .lp-title { display: flex; flex-direction: column; font-weight: 400; }
 .lp-title .t1 { font-family: var(--font-display); font-weight: 300; font-size: clamp(26px, 3vw, 44px); color: rgba(241, 233, 231, .7); }
@@ -37,7 +51,12 @@
 .lp-title .t3 { font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 3.7vw, 54px); line-height: 1; text-transform: uppercase; color: #F97B55; }
 .lp-desc { margin-top: 26px; max-width: 470px; font-size: 15px; line-height: 1.55; color: rgba(241, 233, 231, .8); }
 .lp-ctas { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
-.lp-hero-nums { display: flex; margin-top: 52px; }
+.lp-hero-nums { position: relative; isolation: isolate; align-self: flex-start; display: flex; margin-top: 44px; padding: 18px 24px 16px; border: 1px solid rgba(249, 123, 85, .22); border-radius: 6px; background: rgba(241, 233, 231, .06); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); }
+.lp-hero-nums::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: rgba(29, 29, 27, .55); } /* barreira: o texto passa em contraste com qualquer fundo */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lp-nav { background: rgba(29, 29, 27, .94); }
+  .lp-hero-nums { background: rgba(29, 29, 27, .9); }
+}
 .lp-hero-nums div { padding: 0 24px; border-left: 1px solid rgba(241, 233, 231, .25); }
 .lp-hero-nums div:first-child { padding-left: 0; border-left: 0; }
 .lp-hero-nums b { display: block; font-family: var(--font-display); font-weight: 200; font-size: clamp(36px, 4vw, 56px); line-height: 1; color: #F97B55; font-variant-numeric: tabular-nums; }
@@ -100,13 +119,17 @@
 /* Chamada final, no coral da contracapa */
 .lp-cta { position: relative; z-index: 1; min-height: 86svh; overflow: hidden; background: #F97B55; color: #1D1D1B; padding: clamp(80px, 12vw, 160px) var(--pad) 140px; }
 .lp-cta .lp-btn { margin-top: 36px; }
-.lp-chapeu { position: absolute; right: var(--pad); bottom: 80px; width: min(480px, 42vw); transform: rotate(-6deg); pointer-events: none; }
+.lp-chapeu { position: absolute; right: var(--pad); bottom: 80px; width: min(480px, 42vw); height: auto; transform: rotate(-6deg); pointer-events: none; }
 .lp-cta .lockup { position: absolute; left: var(--pad); bottom: 48px; }
 .lp-foot { position: relative; z-index: 1; background: #1D1D1B; padding: 28px var(--pad) 36px; font-size: 12px; line-height: 1.5; color: rgba(241, 233, 231, .55); }
 
 @media (max-width: 959px) {
   .lp-hero, .lp-stick { grid-template-columns: 1fr; }
   .lp-hero .col { justify-content: flex-end; padding-top: 46svh; }
+  .lp-door { position: absolute; top: 72px; left: var(--pad); right: var(--pad); height: calc(46svh - 84px); }
+  .lp-door-art { top: 0; height: 100%; }
+  .lp-glow { background: radial-gradient(76% 36% at 50% 26%, rgba(249, 123, 85, .66), rgba(249, 123, 85, .26) 44%, rgba(249, 123, 85, 0) 74%); }
+  .lp-hero-nums { padding: 14px 16px 12px; }
   .lp-beat { justify-content: flex-end; padding-bottom: 28px; gap: 14px; }
   .lp-count .nm b { font-size: 40px; }
   .lp-qs { grid-template-columns: 1fr; }

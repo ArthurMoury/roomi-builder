@@ -30,6 +30,7 @@ interface State {
   notice: { text: string; id: number } | null
   photo: string | null            // fachada do hotel, fotografada para o relatório (three/Thumbs.tsx)
   photoReq: number                // cada pedido de relatório tira uma foto nova
+  savedSig: string                // o projeto como estava no último esboço salvo, aberto ou começado
   setName: (n: string) => void
   setSpec: (patch: Partial<Spec>) => void
   setCheck: (id: string, on: boolean) => void
@@ -40,14 +41,21 @@ interface State {
   setAutoTemplate: (t: TemplateId) => void
   notify: (text: string) => void
   remove: (uids: string[]) => void
-  purge: (uid: string) => void
+  purge: (uids: string[]) => void
   clear: () => void
+  reset: () => void
+  markSaved: (sig: string) => void
   loadItems: (name: string, items: SketchItem[], spec?: Spec, checks?: Record<string, boolean>) => number
   addItems: (items: SketchItem[], step?: number) => Placed[]
 }
 
 let seq = 0
 const uid = () => `p${++seq}`
+
+// Assinatura do projeto: nome, respostas, checklist e os itens do mapa vivo. Diferente da do último
+// esboço salvo (ou aberto), há trabalho por salvar.
+export const sigOf = (name: string, spec: Spec, checks: Record<string, boolean>, live: Placed[]) =>
+  JSON.stringify([name, spec, checks, live.map((p) => p.uid)])
 
 // Pegada no terreno: quartos de volta ímpares (90° e 270°) trocam largura e profundidade
 export function footprint(itemId: string, rot: Rot) {
@@ -110,6 +118,7 @@ export const useStore = create<State>((set, get) => ({
   notice: null,
   photo: null,
   photoReq: 0,
+  savedSig: sigOf('', EMPTY_SPEC, {}, []),
   setName: (hotelName) => set({ hotelName }),
   setSpec: (patch) => set((s) => ({ spec: { ...s.spec, ...patch } })),
   setCheck: (id, on) => set((s) => ({ checks: { ...s.checks, [id]: on } })),
@@ -127,14 +136,21 @@ export const useStore = create<State>((set, get) => ({
   setAutoTemplate: (autoTemplate) => set({ autoTemplate }),
   notify: (text) => set({ notice: { text, id: Date.now() } }),
   remove: (uids) => { if (uids.length) set((s) => ({ dying: new Set([...s.dying, ...uids]) })) },
-  purge: (u) =>
+  purge: (uids) =>
     set((s) => {
+      const gone = new Set(uids)
       const dying = new Set(s.dying)
-      dying.delete(u)
-      return { placed: s.placed.filter((p) => p.uid !== u), dying }
+      for (const u of uids) dying.delete(u)
+      return { placed: s.placed.filter((p) => !gone.has(p.uid)), dying }
     }),
   // começa um projeto novo: demole o mapa e volta o questionário ao primeiro passo
   clear: () => set((s) => ({ dying: new Set(s.placed.map((p) => p.uid)), hotelName: '', spec: { ...EMPTY_SPEC }, checks: {}, skipped: [] })),
+  // projeto novo vindo da apresentação: o board já abre vazio, sem demolição
+  reset: () => set({
+    hotelName: '', spec: { ...EMPTY_SPEC }, checks: {}, skipped: [], modal: null, explain: false,
+    placed: [], dying: new Set(), delays: {}, notice: null, photo: null, savedSig: sigOf('', EMPTY_SPEC, {}, []),
+  }),
+  markSaved: (savedSig) => set({ savedSig }),
   // Substitui o mapa pelos itens dados (modelo ou esboço salvo) e devolve quantos ficaram de fora:
   // item que não existe no catálogo, fora do terreno ou em cima de outro.
   loadItems: (name, items, spec = EMPTY_SPEC, checks = {}) => {
@@ -147,7 +163,7 @@ export const useStore = create<State>((set, get) => ({
     const step = Math.min(70, 4000 / Math.max(placed.length, 1)) // a cascata inteira dura até ~4 s
     const delays: Record<string, number> = {}
     placed.forEach((p, i) => (delays[p.uid] = Math.round(i * step)))
-    set({ hotelName: name, placed, delays, dying: new Set(), spec, checks, skipped: [], autoTemplate: spec.destino ? templateOf(spec) : get().autoTemplate })
+    set({ hotelName: name, placed, delays, dying: new Set(), spec, checks, skipped: [], autoTemplate: spec.destino ? templateOf(spec) : get().autoTemplate, savedSig: sigOf(name, spec, checks, placed) })
     return skipped
   },
   // Acrescenta itens ao mapa em cascata (`step` ms entre um e outro); devolve os que couberam.

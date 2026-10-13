@@ -32,7 +32,7 @@ export function resetView(inset: Inset) {
   Object.assign(cam, { az: 0, zoom: 1 }, inset)
 }
 
-export const POLAR = 0.86 // ângulo da câmera a partir da vertical (o board aparece reto, de frente)
+const POLAR = 0.86   // ângulo da câmera a partir da vertical (o board aparece reto, de frente)
 const PAD = 20       // folga entre o conteúdo e a interface, em px
 const BOTTOM = -1.8  // fundo das lajes
 const TALL = 5       // altura dos prédios mais altos, para não cortar os telhados

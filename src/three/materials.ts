@@ -29,7 +29,7 @@ const halftoneShader = {
 
 export const halftones: THREE.ShaderMaterial[] = []
 
-export function halftone(bg: string, dot: string, cell: number, r: number, drift: [number, number] = [0, 0], cut = false) {
+function halftone(bg: string, dot: string, cell: number, r: number, drift: [number, number] = [0, 0], cut = false) {
   const m = new THREE.ShaderMaterial({
     ...halftoneShader,
     side: cut ? THREE.DoubleSide : THREE.FrontSide,

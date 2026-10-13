@@ -3,25 +3,25 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import type { Inset } from '../three/view'
 import { PAGE_H, PAGE_W, ReportSheets } from '../ui/ReportSheets'
+import { Door } from './Door'
 import { Plan } from './Plan'
 import { BIZ, EV, MODEL, SHOW } from './example'
 import { fall } from './motion'
+import { figure, pct, years } from '../lib/range'
+import { Fig } from '../ui/ReportSheets'
 import './landing.css'
 
 gsap.registerPlugin(ScrollTrigger)
 
 // LP que antecede o Maker. Segue o cofre (design › Animação de rolagem e bibliotecas › GSAP): a
 // rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com position: sticky
-// e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. Na abertura, o livro da
-// Roomi gira e folheia no 3D; nos passos, os elementos do resort caem do céu. O 3D carrega à parte, com
-// a planta estática nos passos enquanto isso (ou de vez, sem WebGL). Todos os números saem do motor,
-// para o resort de exemplo.
+// e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. Na abertura, a porta da
+// Roomi abre em Canvas 2D e a luz coral dela tinge a sala; nos passos, os elementos do resort caem do
+// céu no 3D, que só carrega depois da abertura (com a planta estática no lugar enquanto isso, ou de
+// vez, sem WebGL). Todos os números saem do motor, para o resort de exemplo.
 
 const Showcase = lazy(() => import('./Showcase'))
 
-const num = (v: number, d = 0) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d })
-const mi = (v: number) => num(v / 1e6, Math.abs(v) >= 1e8 ? 0 : 1)
-const pct = (v: number, d = 0) => `${num(v * 100, d)}%`
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 // barras do caixa no passo dos cálculos, crescendo uma depois da outra até k = 1
 const drawCash = (k: number) => document.querySelectorAll<SVGRectElement>('.lp-mini .bar').forEach((el, i, all) => {
@@ -43,7 +43,7 @@ const BEATS: { title: string; lead: string; note: string; chart?: boolean }[] = 
   {
     title: 'Entenda os cálculos',
     lead: 'Obra, receita, GOP, EBITDA e retorno em 10 anos, com a fonte de cada número.',
-    note: `No exemplo: TIR real de ${pct(BIZ.irr ?? 0, 1)} e a obra paga em ${num(BIZ.payback ?? 0, 1)} anos.`,
+    note: `No exemplo: TIR real de ${pct(BIZ.r.irr)} e a obra paga em ${years(BIZ.r.payback)}.`,
     chart: true,
   },
   {
@@ -70,9 +70,10 @@ const insetFor = (w: number, h: number): Inset =>
 
 const webgl = (() => { try { return !!document.createElement('canvas').getContext('webgl2') } catch { return false } })()
 
-// Caixa acumulado do exemplo, compacto: a obra afunda no ano 0 e o EBITDA traz de volta
+// Caixa acumulado do exemplo, compacto e sem números (o desenho do cenário central): a obra afunda no
+// ano 0 e o caixa da operação traz de volta
 function MiniCash() {
-  const pts = [{ t: 0, cum: -BIZ.investment }, ...BIZ.years.map((y) => ({ t: y.t, cum: y.cum }))]
+  const pts = [{ t: 0, cum: -BIZ.investment }, ...(BIZ.mid?.years ?? []).map((y) => ({ t: y.t, cum: y.cum }))]
   const W = 480, H = 132, top = 6, bottom = 22
   const lo = Math.min(0, ...pts.map((p) => p.cum)), hi = Math.max(0, ...pts.map((p) => p.cum))
   const y = (v: number) => top + ((hi - v) / (hi - lo || 1)) * (H - top - bottom)
@@ -102,6 +103,9 @@ export default function Landing({ onStart }: { onStart: () => void }) {
   const reader = useRef<HTMLDivElement>(null)
   const [beat, setBeat] = useState(-1)
   const [paused, setPaused] = useState(false)
+  const [heroOn, setHeroOn] = useState(true)  // a abertura, opaca, cobre o 3D
+  const [want3d, setWant3d] = useState(false) // o 3D carrega depois da abertura
+  const glow = useRef<HTMLDivElement>(null)
   const [still] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [inset, setInset] = useState(() => insetFor(innerWidth, innerHeight))
   const [photo, setPhoto] = useState<string | null>(null)
@@ -136,7 +140,8 @@ export default function Landing({ onStart }: { onStart: () => void }) {
           drawCash(cashK.current)
         },
       })
-      // com a página clara por cima, o 3D para de desenhar; a foto da capa do relatório sai antes
+      // o 3D só desenha com a abertura saindo e sem a página clara por cima; a foto da capa sai antes
+      ScrollTrigger.create({ trigger: '.lp-hero', start: 'bottom 70%', onEnter: () => setHeroOn(false), onLeaveBack: () => setHeroOn(true) })
       ScrollTrigger.create({ trigger: '.lp-questions', start: 'top top', onEnter: () => setPaused(true), onLeaveBack: () => setPaused(false) })
       ScrollTrigger.create({ trigger: '.lp-questions', start: 'top bottom', once: true, onEnter: () => setWantPhoto(true) })
 
@@ -211,6 +216,22 @@ export default function Landing({ onStart }: { onStart: () => void }) {
     return () => { html.style.overflow = ''; window.removeEventListener('keydown', onKey) }
   }, [reading, scale])
 
+  // o pedaço 3D (three.js) chega no primeiro respiro do navegador ou na primeira rolagem
+  useEffect(() => {
+    if (!webgl) return
+    const go = () => setWant3d(true)
+    const ric = 'requestIdleCallback' in window // o Safari não tem
+    const idle = ric ? requestIdleCallback(go, { timeout: 2500 }) : window.setTimeout(go, 1200)
+    addEventListener('scroll', go, { once: true, passive: true })
+    return () => {
+      if (ric) cancelIdleCallback(idle)
+      else clearTimeout(idle)
+      removeEventListener('scroll', go)
+    }
+  }, [])
+  // a luz da porta tinge a sala: quanto mais aberta, mais forte o brilho coral (só opacidade, sem repintar)
+  const onLight = useCallback((open: number) => { if (glow.current) glow.current.style.opacity = (0.45 + 0.55 * open).toFixed(3) }, [])
+
   const onPhoto = useCallback((url: string) => { setPhoto(url); setWantPhoto(false) }, [])
   const start = (e?: MouseEvent) => {
     e?.preventDefault()
@@ -228,9 +249,9 @@ export default function Landing({ onStart }: { onStart: () => void }) {
   return (
     <div className="lp" ref={root}>
       <div className="lp-canvas" aria-hidden="true">
-        {webgl ? (
-          <Suspense fallback={beat < 0 ? null : plan}>
-            <Showcase beat={beat} inset={inset} paused={paused} still={still} wantPhoto={wantPhoto} onPhoto={onPhoto} />
+        {webgl ? want3d && (
+          <Suspense fallback={plan}>
+            <Showcase beat={beat} inset={inset} paused={paused || heroOn} still={still} wantPhoto={wantPhoto} onPhoto={onPhoto} />
           </Suspense>
         ) : plan}
       </div>
@@ -241,6 +262,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
       </header>
 
       <section className="lp-hero">
+        <div className="lp-glow" ref={glow} aria-hidden="true" />
         <div className="col">
           <h1 className="lp-title">
             <span className="t1 rise">Simulador de resorts</span>
@@ -254,11 +276,12 @@ export default function Landing({ onStart }: { onStart: () => void }) {
           </div>
           <div className="lp-hero-nums rise">
             <div><b>{EV.keys}</b><span>UHs</span></div>
-            <div><b>{mi(BIZ.investment)}</b><span>R$ mi de investimento</span></div>
-            <div><b>{num((BIZ.irr ?? 0) * 100, 1)}</b><span>% de TIR real</span></div>
+            <div><b><Fig text={figure(BIZ.r.investment, 1e6)} /></b><span>R$ mi de investimento</span></div>
+            <div><b><Fig text={figure(BIZ.r.irr, 0.01, 0.01)} /></b><span>% de TIR real</span></div>
           </div>
           <p className="lp-note rise">Exemplo: {MODEL.name.toLowerCase()}, montado no Maker.</p>
         </div>
+        <div className="lp-door" aria-hidden="true"><Door still={still} onLight={onLight} /></div>
       </section>
 
       <section className="lp-build" aria-label="Como funciona, passo a passo">
@@ -302,7 +325,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
       <section className="lp-cta">
         <h2 className="lp-h2">Seu estudo fica pronto em 8 respostas.</h2>
         <a className="lp-btn ink" href="#builder" onClick={start}>Começar meu projeto</a>
-        <img className="lp-chapeu" src="/roomi-chapeu.svg" alt="" />
+        <img className="lp-chapeu" src="/roomi-chapeu.png" width="583" height="370" loading="lazy" decoding="async" alt="" />
         <div className="lockup ink"><span className="wm" /><i /><span>Maker</span></div>
       </section>
 
