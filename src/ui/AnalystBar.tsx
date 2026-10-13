@@ -9,6 +9,7 @@ import { brl } from '../lib/range'
 import { view } from '../three/view'
 import { InvestRange, RangeText } from './Counter'
 import { InfoIcon } from './icons'
+import { isTouch } from './media'
 
 // Questionário que monta o hotel no mapa enquanto é respondido. Uma pergunta por vez; cada
 // resposta vira uma etiqueta acima da barra, que leva de volta à pergunta. Destino, categoria,
@@ -109,7 +110,8 @@ function crumbText(s: Step, v: string | number | null, skipped: boolean) {
 // ── nome do projeto: campo grande em Editorial ─────────────────────────────
 function NameField({ s, value, onNext }: { s: Extract<Step, { kind: 'text' }>; value: string; onNext: () => void }) {
   const ref = useRef<HTMLInputElement>(null)
-  useEffect(() => { ref.current?.focus() }, [])
+  // no toque, o teclado só abre quando a pessoa toca no campo (senão cobre o mapa logo na chegada)
+  useEffect(() => { if (!isTouch()) ref.current?.focus() }, [])
   return (
     <div className="dial">
       <label className="dial-value name-value">
@@ -314,7 +316,7 @@ export function AnalystBar({ ev, biz }: { ev: Evaluation; biz: Business }) {
           <div className="out"><span className="lb">EBITDA por mês</span><b><RangeText text={biz.ready ? brl(biz.r.ebitdaMonth) : '—'} /></b></div>
           <div className="q-actions">
             <button className="icon-btn" onClick={() => open('explain')} aria-label="Como calculamos" title="Como calculamos"><InfoIcon /></button>
-            <button className="btn primary" onClick={() => open('checklist')} disabled={!biz.ready}>Escopo e relatório</button>
+            <button className="btn primary" onClick={() => open('checklist')} disabled={!biz.ready}><span className="wide">Escopo e </span>relatório</button>
           </div>
         </div>
       </div>

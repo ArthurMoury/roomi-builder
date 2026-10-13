@@ -29,7 +29,11 @@ export function BusinessReport({ ev, biz, onClose }: { ev: Evaluation; biz: Busi
   const [scale, setScale] = useState(1)
   useLayoutEffect(() => {
     const el = scroller.current!
-    const fit = () => setScale(Math.min(1, (el.clientWidth - 48) / PAGE_W))
+    // a folha cabe na largura livre, descontadas as margens da coluna (menores no celular)
+    const fit = () => {
+      const cs = getComputedStyle(el)
+      setScale(Math.min(1, (el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) / PAGE_W))
+    }
     fit()
     const ro = new ResizeObserver(fit)
     ro.observe(el)
@@ -39,11 +43,14 @@ export function BusinessReport({ ev, biz, onClose }: { ev: Evaluation; biz: Busi
   return (
     <motion.div className="overlay deck-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <div className="deck-tools" onClick={(e) => e.stopPropagation()}>
-        <button className="btn" onClick={() => useStore.getState().openModal('checklist')}>Voltar ao checklist</button>
-        <button className="btn" onClick={() => useStore.getState().openModal('explain')}>Como calculamos</button>
-        <button className="btn" onClick={() => window.print()}>Imprimir / PDF</button>
-        <button className="btn" onClick={saveHtml} disabled={!photo || saving} title={photo ? 'Um arquivo .html que abre sozinho, sem internet' : 'Esperando a foto da fachada'}>{saving ? 'Gerando HTML…' : 'Baixar HTML'}</button>
-        <button className="btn primary" onClick={onClose}>Fechar</button>
+        {/* no celular, os nomes curtos: checklist e fechar em cima, cálculo e arquivos embaixo */}
+        <button className="btn back" onClick={() => useStore.getState().openModal('checklist')}><span className="wide">Voltar ao </span>checklist</button>
+        <button className="btn how" onClick={() => useStore.getState().openModal('explain')}>Como calculamos</button>
+        <button className="btn pdf" onClick={() => window.print()}><span className="wide">Imprimir / </span>PDF</button>
+        <button className="btn html" onClick={saveHtml} disabled={!photo || saving} title={photo ? 'Um arquivo .html que abre sozinho, sem internet' : 'Esperando a foto da fachada'}>
+          {saving ? <>Gerando<span className="wide"> HTML</span>…</> : <><span className="wide">Baixar </span>HTML</>}
+        </button>
+        <button className="btn primary close" onClick={onClose}>Fechar</button>
       </div>
       <div className="deck-scroll" ref={scroller} onClick={(e) => e.stopPropagation()}>
         <motion.div className="sheets" ref={sheets} style={{ '--s': scale } as CSSProperties}

@@ -95,6 +95,7 @@ function MiniCash() {
 
 const STEP_GAP = 22   // espaço entre as folhas no leitor (o mesmo de .sheets)
 const READER_PAD = 64 // respiro acima da primeira folha no leitor (o mesmo de .lp-viewer-scroll)
+const readerSide = () => (innerWidth < 960 ? 8 : 24) // margem dos lados no leitor (a mesma de .lp-viewer-scroll)
 
 export default function Landing({ onStart }: { onStart: () => void }) {
   const root = useRef<HTMLDivElement>(null)
@@ -154,7 +155,8 @@ export default function Landing({ onStart }: { onStart: () => void }) {
         gsap.fromTo(fall, { p: 0 }, { p: P_MAX + 1, ease: 'none', scrollTrigger: { trigger: build, start: 'top bottom', end: () => `+=${build.offsetHeight}`, scrub: 1.2, invalidateOnRefresh: true } })
         gsap.from('.lp-hero .rise', { y: 12, opacity: 0, duration: 0.42, stagger: 0.07, ease: 'power2.out', delay: 0.1 })
         // na abertura presa, o texto sai antes de a câmera entrar pela porta
-        gsap.to('.lp-hero .col', { opacity: 0, y: -48, ease: 'none', scrollTrigger: { trigger: '.lp-hero', start: 'top top', end: () => `+=${innerHeight * 0.32}`, scrub: 0.4, invalidateOnRefresh: true } })
+        // na tela em pé o texto fica embaixo da arte: sai mais cedo e descendo, longe da entrada que cresce
+        gsap.to('.lp-hero .col', { opacity: 0, y: () => (innerHeight > innerWidth ? 48 : -48), ease: 'none', scrollTrigger: { trigger: '.lp-hero', start: 'top top', end: () => `+=${innerHeight * (innerHeight > innerWidth ? 0.1 : 0.32)}`, scrub: 0.4, invalidateOnRefresh: true } })
         // perguntas entram 12 px em 260 ms, uma depois da outra
         gsap.set('.lp-q', { opacity: 0, y: 12 })
         ScrollTrigger.batch('.lp-q', {
@@ -208,7 +210,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
   }, [current, still])
 
   // leitor do relatório: trava a página, abre na folha clicada e fecha com Esc
-  const scale = Math.min(1, (innerWidth - 48) / PAGE_W)
+  const scale = Math.min(1, (innerWidth - 2 * readerSide()) / PAGE_W)
   useLayoutEffect(() => {
     if (reading == null) return
     const html = document.documentElement
@@ -324,7 +326,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
 
       <section className="lp-report">
         <h2 className="lp-h2">Analise <span className="hl">à frente do tempo</span>.</h2>
-        <p className="lp-lede">O relatório do exemplo, gerado pelo Maker, traz para hoje os próximos 10 anos do resort: investimento, operação, caixa, valor e risco, em seis folhas A4 e sempre em faixas. Clique numa folha para ler.</p>
+        <p className="lp-lede">O relatório do exemplo, gerado pelo Maker, traz para hoje os próximos 10 anos do resort: investimento, operação, caixa, valor e risco, em seis folhas A4 e sempre em faixas. Abra uma folha para ler.</p>
         <div className="sheets lp-deck" style={{ '--s': 0.38 } as CSSProperties} onClick={openSheet}>{report}</div>
         <button className="lp-btn ghost lp-read" onClick={() => setReading(0)}>Ler o relatório do exemplo</button>
       </section>

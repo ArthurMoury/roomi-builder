@@ -4,8 +4,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { GRID } from '../store'
 
 // Câmera fixa, reta e de frente para o board (a chegada, ao sul, fica embaixo). O board só gira de
-// 90 em 90 graus, pelo clique numa das laterais, e a roda do mouse aproxima ou afasta. Não há
-// órbita livre nem arrasto. O enquadramento cabe o board (e o mar, quando houver) na área que a
+// 90 em 90 graus, pelo clique numa das laterais, e a roda do mouse (no toque, a pinça com dois dedos)
+// aproxima ou afasta. Não há órbita livre nem arrasto. O enquadramento cabe o board (e o mar, quando houver) na área que a
 // interface deixa livre.
 
 export interface Inset { top: number; right: number; bottom: number; left: number }
@@ -80,12 +80,41 @@ export function CameraRig({ wheel = true }: { wheel?: boolean }) {
   useEffect(() => {
     if (!wheel) return
     const el = gl.domElement
+    const zoomBy = (f: number) => { view.zoom = THREE.MathUtils.clamp(view.zoom * f, 0.45, 1.25) }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      view.zoom = THREE.MathUtils.clamp(view.zoom * Math.exp(e.deltaY * 0.001), 0.45, 1.25)
+      zoomBy(Math.exp(e.deltaY * 0.001))
     }
+    // pinça: dois dedos se afastando aproximam o board, na mesma proporção da distância entre eles
+    const touches = new Map<number, { x: number; y: number }>()
+    let span = 0
+    const gap = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y) }
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      span = touches.size === 2 ? gap() : 0
+    }
+    const onMove = (e: PointerEvent) => {
+      if (!touches.has(e.pointerId)) return
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (touches.size !== 2 || !span) return
+      const d = gap()
+      zoomBy(span / d)
+      span = d
+    }
+    const onUp = (e: PointerEvent) => { touches.delete(e.pointerId); span = 0 }
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', onUp)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onUp)
+    }
   }, [gl, wheel])
 
   useFrame((state, dt) => {

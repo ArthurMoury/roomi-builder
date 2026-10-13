@@ -13,6 +13,7 @@ import { evaluate } from './lib/valuation'
 import { business } from './lib/business'
 import { downloadSketch, parseSketch } from './lib/sketch'
 import { resetView, view } from './three/view'
+import { isPhone, isTouch } from './ui/media'
 
 const SunIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
@@ -23,6 +24,11 @@ const SunIcon = () => (
 const MoonIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
     <path d="M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1Z" />
+  </svg>
+)
+const MoreIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+    <circle cx="3" cy="8" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="13" cy="8" r="1.4" />
   </svg>
 )
 
@@ -57,14 +63,28 @@ export default function App({ onHome }: { onHome: () => void }) {
 
   // o board abre reto e de frente; a primeira vez, ensina o giro
   useEffect(() => {
-    resetView({ top: 88, right: 16, bottom: 230, left: 16 })
-    notify('Clique numa das laterais do board para girá-lo 90°')
+    resetView(isPhone() ? { top: 68, right: 8, bottom: 230, left: 8 } : { top: 88, right: 16, bottom: 230, left: 16 })
+    notify(`${isTouch() ? 'Toque' : 'Clique'} numa das laterais do board para girá-lo 90°`)
   }, [])
   // com o checklist aberto, o board recua para a esquerda e desce até o pé da tela
+  // (no celular o checklist fica embaixo do mapa e ele mesmo diz quanto ocupa)
   useEffect(() => {
+    if (isPhone()) return
     view.inset.right = checklist ? 462 : 16
     if (checklist) view.inset.bottom = 16
   }, [checklist])
+
+  // menu das outras ações, quando a barra de cima não cabe todas (celular e tablet): fecha com um
+  // toque fora dele, com Esc ou depois de escolher
+  const [menu, setMenu] = useState(false)
+  useEffect(() => {
+    if (!menu) return
+    const off = (e: PointerEvent) => { if (!(e.target as Element).closest('.topbar')) setMenu(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false) }
+    document.addEventListener('pointerdown', off)
+    window.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('pointerdown', off); window.removeEventListener('keydown', esc) }
+  }, [menu])
 
   // Comemora quando o hotel sobe de categoria
   const lastTier = useRef(-1)
@@ -143,22 +163,28 @@ export default function App({ onHome }: { onHome: () => void }) {
           <span className="logo" aria-hidden="true" /><span>Maker</span>
         </button>
         <span className={`project ${name ? '' : 'empty'}`}>{name || 'Novo projeto'}</span>
-        <button className="btn icon" onClick={() => useStore.getState().setTheme(theme === 'dark' ? 'light' : 'dark')}
-          aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'} title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span key={theme} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }}
-              transition={{ duration: 0.2 }} style={{ display: 'grid' }}>
-              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-            </motion.span>
-          </AnimatePresence>
-        </button>
-        <button className="btn" onClick={() => fileInput.current?.click()}>Abrir</button>
-        <button className="btn save" onClick={save} disabled={!live.length}>Salvar esboço</button>
+        {/* Salvar fica sempre à vista; as outras ações vão para o menu quando a barra não cabe todas.
+            Na barra inteira, a ordem (order no CSS) segue tema, Abrir, Salvar, Modelos, Limpar e relatório. */}
+        <button className="btn save" onClick={save} disabled={!live.length}>Salvar<span className="wide"> esboço</span></button>
+        <button className="btn icon more" onClick={() => setMenu(!menu)} aria-expanded={menu} aria-label="Mais ações" title="Mais ações"><MoreIcon /></button>
+        <div className={`top-more ${menu ? 'open' : ''}`} onClick={() => setMenu(false)}>
+          <button className="btn icon" onClick={() => useStore.getState().setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'} title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span key={theme} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }}
+                transition={{ duration: 0.2 }} style={{ display: 'grid' }}>
+                {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+              </motion.span>
+            </AnimatePresence>
+            <span className="in-menu">{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
+          </button>
+          <button className="btn" onClick={() => fileInput.current?.click()}>Abrir<span className="in-menu"> esboço</span></button>
+          <button className="btn late" onClick={() => useStore.getState().openModal('models')}>Modelos</button>
+          <button className="btn late" onClick={() => useStore.getState().clear()}>Limpar</button>
+          {/* o relatório começa pelo checklist de escopo */}
+          <button className="btn primary late" onClick={() => useStore.getState().openModal('checklist')} disabled={!live.length}>Ver relatório</button>
+        </div>
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={(e) => open(e.target.files?.[0])} />
-        <button className="btn" onClick={() => useStore.getState().openModal('models')}>Modelos</button>
-        <button className="btn" onClick={() => useStore.getState().clear()}>Limpar</button>
-        {/* o relatório começa pelo checklist de escopo */}
-        <button className="btn primary" onClick={() => useStore.getState().openModal('checklist')} disabled={!live.length}>Ver relatório</button>
       </motion.header>
 
       <div className="dock">

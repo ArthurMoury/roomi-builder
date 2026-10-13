@@ -20,10 +20,10 @@
 .lp .lockup.ink i { background: rgba(29, 29, 27, .4); }
 
 .lp-btn { display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 22px; border: 1px solid #F97B55; border-radius: 3px; background: #F97B55; color: #1D1D1B; font: 500 12.5px var(--font-sans); letter-spacing: .1em; text-transform: uppercase; text-decoration: none; white-space: nowrap; cursor: pointer; transition: transform .22s cubic-bezier(.2, .7, .2, 1); }
-.lp-btn:hover { transform: translateY(-2px); }
+@media (hover: hover) { .lp-btn:hover { transform: translateY(-2px); } }
 .lp-btn:focus-visible, .lp-skip:focus-visible, .lp .lockup:focus-visible { outline: 2px solid #F1E9E7; outline-offset: 3px; }
 .lp-btn.ghost { background: transparent; color: #F1E9E7; border-color: rgba(241, 233, 231, .35); }
-.lp-btn.ghost:hover { border-color: #F1E9E7; }
+@media (hover: hover) { .lp-btn.ghost:hover { border-color: #F1E9E7; } }
 .lp-btn.ink { background: #1D1D1B; color: #F1E9E7; border-color: #1D1D1B; }
 .lp-btn.ink:focus-visible { outline-color: #1D1D1B; }
 
@@ -112,7 +112,7 @@
 /* Relatório: as seis folhas, em pilha que abre em leque com a rolagem; um clique abre o leitor */
 .sheets.lp-deck { margin-top: 56px; display: flex; flex-direction: row; align-items: flex-start; gap: 16px; overflow-x: auto; padding: 4px 4px 16px; scroll-snap-type: x mandatory; }
 .lp-deck .sheet-wrap { flex: none; scroll-snap-align: center; cursor: zoom-in; outline: 1px solid rgba(241, 233, 231, .28); contain: layout style; transition: translate .22s cubic-bezier(.2, .7, .2, 1); }
-.lp-deck .sheet-wrap:hover { translate: 0 -10px; }
+@media (hover: hover) { .lp-deck .sheet-wrap:hover { translate: 0 -10px; } }
 .lp-deck .sheet { pointer-events: none; }
 .sheets.lp-deck.fan { position: relative; display: block; height: calc(1123px * var(--s) + 110px); overflow: visible; padding: 0; }
 .lp-deck.fan .sheet-wrap { position: absolute; top: 24px; left: calc(50% - 794px * var(--s) / 2); will-change: transform; }
@@ -130,9 +130,13 @@
 .lp-foot { position: relative; z-index: 1; background: #1D1D1B; padding: 28px var(--pad) 36px; font-size: 12px; line-height: 1.5; color: rgba(241, 233, 231, .55); }
 
 @media (max-width: 959px) {
-  .lp-hero-stick, .lp-stick { grid-template-columns: minmax(0, 1fr); }
-  .lp-hero .col { justify-content: flex-end; padding-top: 46svh; }
-  .lp-door { position: absolute; top: 76px; left: var(--pad); right: var(--pad); height: calc(46svh - 92px); margin: 0; }
+  .lp-stick { grid-template-columns: minmax(0, 1fr); }
+  /* a arte no alto fica com a altura que o texto deixa, e o texto inteiro cabe na tela presa */
+  .lp-hero-stick { display: flex; flex-direction: column; }
+  .lp-door { order: -1; flex: 1 1 auto; min-height: 120px; margin: 12px 0 14px; }
+  .lp-hero .col { flex: none; justify-content: flex-start; padding: 8px 0 22px; }
+  .lp-viewer { background: #1D1D1B; }
+  .lp-viewer-scroll { padding-left: 8px; padding-right: 8px; }
   .lp-glow { background: radial-gradient(76% 36% at 50% 26%, rgba(249, 123, 85, .66), rgba(249, 123, 85, .26) 44%, rgba(249, 123, 85, 0) 74%); }
   .lp-hero-nums { padding: 14px 16px 12px; }
   .lp-beat { justify-content: flex-end; padding-bottom: 28px; gap: 14px; }
@@ -147,4 +151,18 @@
   .lp-beat .cap h2 { font-size: 36px; }
   .lp-lead { font-size: 20px; }
   .lp-mini { max-width: 100%; }
+}
+/* Celular: o texto da abertura mais justo, os dois botões numa linha e o cartão numa linha só */
+@media (max-width: 600px) {
+  .lp-title .t1 { font-size: 24px; }
+  .lp-title .t2 { font-size: 42px; margin: 6px 0 10px; }
+  .lp-title .t3 { font-size: 26px; }
+  .lp-desc { margin-top: 16px; font-size: 14.5px; line-height: 1.5; }
+  .lp-ctas { gap: 8px; margin-top: 20px; }
+  .lp-ctas .lp-btn { padding: 0 14px; font-size: 11px; letter-spacing: .06em; }
+  .lp-hero-nums { margin-top: 22px; }
+  .lp-hero-nums div { padding: 0 14px; }
+  .lp-hero-nums b { font-size: 30px; }
+  .lp-hero-nums span { margin-top: 6px; font-size: 9.5px; letter-spacing: .14em; }
+  .lp-note { margin-top: 10px; }
 }

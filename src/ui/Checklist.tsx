@@ -1,5 +1,8 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { useStore } from '../store'
+import { view } from '../three/view'
+import { isPhone } from './media'
 import { answerScope } from '../lib/program'
 import { obraRange, type Business } from '../lib/business'
 import { brl } from '../lib/range'
@@ -23,21 +26,33 @@ const row = (i: number) => ({
   animate: { opacity: 1, x: 0, transition: { delay: 0.12 + i * 0.05, type: 'spring' as const, stiffness: 320, damping: 28 } },
 })
 
-// Primeira etapa do relatório, ao lado do mapa: cada resposta de lazer constrói ou demole no mapa
-// na hora, e os custos fora da obra entram no investimento quando confirmados
+// Primeira etapa do relatório, ao lado do mapa (no celular, embaixo dele): cada resposta de lazer
+// constrói ou demole no mapa na hora, e os custos fora da obra entram no investimento quando confirmados
 export function Checklist({ biz, onClose }: { biz: Business; onClose: () => void }) {
   const setCheck = useStore((s) => s.setCheck)
   const open = (t: 'report' | 'explain') => useStore.getState().openModal(t)
   const n = biz.scope.length
 
+  // no celular a folha sobe do pé da tela e o board fica no espaço livre acima dela
+  const [phone] = useState(isPhone)
+  const box = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    if (!phone) return
+    const el = box.current!
+    const ro = new ResizeObserver(() => { view.inset.bottom = 8 + el.offsetHeight + 8 })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [phone])
+  const away = phone ? { y: 120, opacity: 0 } : { x: 440, opacity: 0 }
+
   return (
-    <motion.aside className="panel checklist fields" initial={{ x: 440, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 440, opacity: 0 }}
+    <motion.aside ref={box} className="panel checklist fields" initial={away} animate={{ x: 0, y: 0, opacity: 1 }} exit={away}
       transition={{ type: 'spring', stiffness: 220, damping: 28 }}>
       <header className="ck-head">
         <div className="ck-step"><b>01</b><i>/02</i></div>
         <div>
           <h2>Checklist de escopo</h2>
-          <p>Confirme o que entra no projeto. Cada resposta muda o mapa ao lado.</p>
+          <p>Confirme o que entra no projeto. Cada resposta muda o mapa na hora.</p>
         </div>
       </header>
 

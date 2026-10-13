@@ -88,7 +88,8 @@ body {
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 input { font: inherit; color: inherit; }
 
-.stage { position: fixed; inset: 0; }
+/* o board ocupa a tela: no toque, a pinça sobre ele aproxima o board em vez de ampliar a página */
+.stage { position: fixed; inset: 0; touch-action: none; }
 
 .panel {
   position: fixed;
@@ -109,7 +110,12 @@ input { font: inherit; color: inherit; }
 .display { font-family: var(--font-display); font-weight: 300; letter-spacing: -0.01em; }
 
 /* Barra superior */
-.topbar { top: 16px; left: 16px; right: 16px; height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 10px 0 18px; }
+.topbar { top: 16px; left: 16px; right: 16px; height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 10px 0 18px; z-index: 8; }
+/* Na barra inteira o menu some e os botões dele entram na fila: tema, Abrir, Salvar, Modelos, Limpar, relatório */
+.top-more { display: contents; }
+.topbar .btn.more, .in-menu { display: none; }
+.topbar .btn.save { order: 1; }
+.top-more .late { order: 2; }
 .brand { display: flex; align-items: center; gap: 12px; white-space: nowrap; padding: 6px 0; }
 .logo {
   display: block;
@@ -125,13 +131,14 @@ input { font: inherit; color: inherit; }
 .project { flex: 1; min-width: 0; border-left: 1px solid var(--line); padding: 4px 16px; font-family: var(--font-display); font-size: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .project.empty { color: var(--muted); }
 .btn { height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
-.btn:hover { border-color: var(--fg); }
+/* realce de passar o mouse só onde há mouse: no toque, o :hover gruda no último toque e parece seleção */
+@media (hover: hover) { .btn:hover { border-color: var(--fg); } }
 .btn.icon { width: 36px; padding: 0; display: grid; place-items: center; }
 .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 500; }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn:disabled:hover { border-color: var(--line); }
 .icon-btn { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 3px; color: var(--muted); }
-.icon-btn:hover { color: var(--fg); background: var(--hover); }
+@media (hover: hover) { .icon-btn:hover { color: var(--fg); background: var(--hover); } }
 
 /* Explicação dos cálculos */
 .reqs { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 13px; }
@@ -159,7 +166,7 @@ input { font: inherit; color: inherit; }
 .crumbs { position: absolute; left: 0; bottom: calc(100% + 10px); display: flex; flex-wrap: wrap; gap: 6px; max-width: 72%; }
 .crumb { display: flex; align-items: baseline; gap: 8px; max-width: 320px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 18px; }
 .crumb b { font-family: var(--font-display); font-weight: 400; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.crumb:hover { border-color: var(--fg); }
+@media (hover: hover) { .crumb:hover { border-color: var(--fg); } }
 .crumb.on { border-color: var(--accent); outline: 1px solid var(--accent); }
 .quiz { position: relative; display: grid; grid-template-columns: 104px minmax(0, 1fr) 340px; min-height: 136px; border: 1px solid var(--line); border-radius: 4px; }
 .q-count { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 0 18px; border-right: 1px solid var(--line); }
@@ -176,7 +183,7 @@ input { font: inherit; color: inherit; }
 .q-text p { font-size: 13px; color: var(--muted); }
 .opts { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 1px 3px; }
 .opt { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; min-height: 56px; border: 1px solid var(--line); border-radius: 3px; text-align: left; flex: none; }
-.opt:hover { border-color: var(--fg); }
+@media (hover: hover) { .opt:hover { border-color: var(--fg); } }
 .opt .opt-pill { position: absolute; inset: -1px; background: var(--accent); border-radius: 3px; }
 .opt .glyph, .opt .txt { position: relative; }
 .opt .glyph { display: grid; place-items: center; width: 30px; height: 30px; }
@@ -189,18 +196,18 @@ input { font: inherit; color: inherit; }
 .btn.ghost { border-color: transparent; color: var(--muted); }
 /* salvar o esboço é o que guarda o trabalho: borda coral para chamar a atenção */
 .btn.save, .btn.save:hover, .btn.save:disabled:hover { border-color: var(--accent); }
-.btn.save:not(:disabled):hover { background: rgba(249, 123, 85, .12); }
+@media (hover: hover) { .btn.save:not(:disabled):hover { background: rgba(249, 123, 85, .12); } }
 /* aviso para salvar o esboço antes de sair */
 .save-prompt { width: min(480px, 100%); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 26px 28px 22px; }
 .save-prompt h2 { font-size: 30px; line-height: 1.05; margin-top: 8px; }
 .save-prompt p { margin-top: 12px; font-size: 14px; line-height: 1.5; color: var(--muted); }
 .save-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .save-actions .ghost { margin-right: auto; padding-left: 0; }
-.btn.ghost:hover { color: var(--fg); border-color: var(--line); }
-.dial { display: flex; align-items: center; gap: 18px; min-width: 0; }
+@media (hover: hover) { .btn.ghost:hover { color: var(--fg); border-color: var(--line); } }
+.dial { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; min-width: 0; } /* quebra em linhas quando não cabe numa só */
 .dial-num { display: flex; align-items: center; gap: 8px; flex: none; }
 .round { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); font-size: 17px; line-height: 1; display: grid; place-items: center; }
-.round:hover { border-color: var(--fg); }
+@media (hover: hover) { .round:hover { border-color: var(--fg); } }
 .dial-value { display: flex; align-items: baseline; gap: 6px; padding: 0 4px 2px; border-bottom: 1px solid var(--fg); cursor: text; }
 .dial-value span { font-size: 13px; color: var(--muted); }
 .dial-value input { font-family: var(--font-display); font-weight: 300; font-size: 38px; line-height: 1; background: transparent; border: 0; outline: none; color: var(--fg); text-align: center; padding: 0; }
@@ -210,9 +217,9 @@ input { font: inherit; color: inherit; }
 .range { -webkit-appearance: none; appearance: none; width: 190px; flex: none; height: 2px; background: linear-gradient(to right, var(--accent) var(--p), var(--line) var(--p)); outline: none; cursor: pointer; }
 .range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); }
 .range::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); }
-.presets { display: flex; gap: 4px; overflow-x: auto; }
+.presets { display: flex; gap: 4px; overflow-x: auto; flex: 1 1 0; min-width: 120px; } /* encolhe (com rolagem) antes de o número quebrar a linha */
 .chip { padding: 6px 11px; border: 1px solid var(--line); border-radius: 14px; font-size: 12px; white-space: nowrap; }
-.chip:hover { border-color: var(--fg); }
+@media (hover: hover) { .chip:hover { border-color: var(--fg); } }
 .chip.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .dial-go { display: flex; gap: 6px; margin-left: auto; flex: none; }
 .q-side { display: grid; grid-template-columns: 1fr 1fr; align-content: center; gap: 12px 14px; padding: 0 16px; border-left: 1px solid var(--line); }
@@ -236,7 +243,7 @@ input { font: inherit; color: inherit; }
 .quad { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--accent); color: var(--roomi-bg); font: 400 14px/1 var(--font-display); padding-top: 2px; flex: none; }
 .ck-body li.off .quad { background: transparent; color: var(--muted); outline: 1px solid var(--line); outline-offset: -1px; }
 .toggle { position: relative; width: 80px; height: 28px; border-radius: 14px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 11px; font: 700 10px var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.toggle:hover { border-color: var(--fg); }
+@media (hover: hover) { .toggle:hover { border-color: var(--fg); } }
 .toggle .knob { position: absolute; top: 3px; left: 3px; width: 37px; height: 20px; border-radius: 10px; background: var(--accent); }
 .toggle:not(.on) .knob { left: auto; right: 3px; background: var(--fg); }
 .toggle span { position: relative; }
@@ -246,6 +253,7 @@ input { font: inherit; color: inherit; }
 .ck-total b { display: block; font-family: var(--font-display); font-weight: 300; font-size: 36px; line-height: 1.1; color: var(--num); margin-top: 4px; }
 .ck-total small { font-size: 11.5px; color: var(--muted); }
 .ck-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.ck-actions .btn { padding: 0 12px; } /* os três cabem na largura do painel */
 
 /* Relatório de negócios: folhas A4 com os elementos dos PDFs da Roomi, sempre nas três cores.
    Medidas do molde de deck levadas ao retrato: margens de 16 mm nas laterais, 15 em cima e 14 embaixo. */
@@ -422,7 +430,7 @@ input { font: inherit; color: inherit; }
 .models { width: min(1120px, 100%); }
 .model-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .model-card { display: flex; flex-direction: column; text-align: left; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: var(--bg); }
-.model-card:hover { border-color: var(--fg); }
+@media (hover: hover) { .model-card:hover { border-color: var(--fg); } }
 .model-img { aspect-ratio: 560 / 340; background: var(--tile); display: grid; place-items: center; }
 .model-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .model-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
@@ -430,6 +438,111 @@ input { font: inherit; color: inherit; }
 .model-body p { font-size: 12.5px; line-height: 1.45; color: var(--muted); }
 .model-body .refs { font-style: italic; }
 .model-body .facts { margin-top: auto; padding-top: 8px; font-size: 12px; color: var(--accent-text); }
+
+/* Tablet e celular: a barra de cima não cabe as sete ações (ficam Salvar e o menu com as outras) e o
+   questionário empilha contagem, pergunta e faixas, com as ações no canto de cima */
+@media (max-width: 960px) {
+  .topbar .btn.more { display: grid; order: 3; }
+  .top-more { display: none; position: absolute; top: calc(100% + 8px); right: -1px; min-width: 232px; flex-direction: column; gap: 4px; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
+  .top-more.open { display: flex; animation: drop .16s ease-out; }
+  .top-more .btn { width: 100%; height: 42px; padding: 0 14px; text-align: left; }
+  .top-more .btn:not(.primary) { border-color: transparent; }
+  .top-more .btn:not(.primary):not(:disabled):hover { background: var(--hover); }
+  .top-more .btn.icon { display: flex; align-items: center; gap: 10px; }
+  .in-menu { display: inline; }
+
+  .crumbs { right: 0; max-width: none; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 1px; }
+  .crumbs::-webkit-scrollbar { display: none; }
+  .crumb { flex: none; }
+  .quiz { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .q-count { flex-direction: row; align-items: center; gap: 12px; padding: 13px 240px 0 20px; border-right: 0; } /* à direita, as ações */
+  .q-count .nm b { font-size: 30px; }
+  .q-progress { flex: 1; }
+  .opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .opt .txt b, .opt .txt small { white-space: normal; }
+  .opts .skip { justify-self: start; }
+  .opts .cta { grid-column: 1 / -1; justify-self: start; }
+  .range { flex: 1; width: auto; min-width: 120px; }
+  .presets { flex: 0 1 auto; min-width: 0; }
+  .q-side { grid-template-columns: 1fr 1fr; gap: 12px; padding: 10px 20px 12px; border-left: 0; border-top: 1px solid var(--line); }
+  .q-actions { position: absolute; top: 8px; right: 10px; }
+}
+@keyframes drop { from { opacity: 0; transform: translateY(-6px); } }
+
+/* Celular: tudo mais justo. O checklist vira uma folha embaixo do mapa e o relatório ganha barras em
+   cima e embaixo. */
+@media (max-width: 720px) {
+  .wide { display: none; }
+  .topbar { top: 8px; left: 8px; right: 8px; height: 52px; gap: 8px; padding: 0 7px 0 14px; }
+  .logo { width: 74px; height: 15px; }
+  .brand span:last-child { display: none; }
+  .project { font-size: 17px; padding: 2px 10px; }
+  .btn.save { padding: 0 12px; }
+  .toast { top: 70px; }
+  .notice { max-width: calc(100vw - 24px); text-align: center; }
+
+  .quiz-wrap { left: 8px; right: 8px; bottom: 8px; }
+  .crumbs { bottom: calc(100% + 7px); }
+  .crumb { padding: 6px 11px; }
+  .crumb b { font-size: 14px; }
+  .q-count { padding: 13px 168px 0 16px; }
+  .q-main { padding: 10px 16px 14px; }
+  .q { gap: 10px; }
+  .q-text { gap: 3px 12px; }
+  .q-text h3 { font-size: 22px; }
+  .q-text p { font-size: 12px; }
+  .opts { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .opt { min-height: 52px; padding: 7px 10px 7px 6px; gap: 6px; }
+  .opt .txt b { font-size: 16px; }
+  .opt .txt small { font-size: 10.5px; line-height: 1.25; }
+  .opts .cta { justify-self: stretch; }
+  .dial { gap: 12px 14px; }
+  .dial-value input { font-size: 30px; }
+  .name-value input { font-size: 24px; }
+  .range { min-width: 90px; }
+  .presets { flex: 1 1 100%; }
+  .dial-go { flex: 1 1 100%; justify-content: flex-end; margin-left: 0; }
+  .name-value + .dial-go { flex: none; } /* no nome, o campo e o Seguir na mesma linha */
+  .q-side { padding: 10px 16px 12px; }
+  .q-side .out b { font-size: 18px; }
+
+  .panel.checklist { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: min(62svh, 600px); }
+  .ck-head { gap: 12px; padding: 14px 16px 12px; }
+  .ck-step b { font-size: 38px; }
+  .ck-head h2 { font-size: 22px; }
+  .ck-head p { font-size: 12px; margin-top: 4px; }
+  .ck-body { padding: 12px 16px 4px; }
+  .ck-body li { gap: 10px; padding: 8px 0; }
+  .ck-foot { gap: 10px; padding: 12px 16px 14px; }
+  .ck-total b { font-size: 26px; }
+  .ck-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .ck-actions .btn { padding: 0 8px; }
+  .ck-actions .btn.primary { grid-column: 1 / -1; order: -1; height: 44px; }
+
+  .overlay { padding: 8px; }
+  /* relatório: checklist e fechar no alto, cálculo e arquivos no pé, as folhas passando entre eles */
+  .deck-overlay { padding: 0; background: #1D1D1B; }
+  .deck-tools { inset: 0; display: grid; grid-template: "back . close" auto ". . ." 1fr "how pdf html" auto / auto 1fr auto; gap: 6px; padding: 10px 8px; pointer-events: none; }
+  .deck-tools .btn { pointer-events: auto; }
+  .deck-tools .back { grid-area: back; justify-self: start; }
+  .deck-tools .close { grid-area: close; }
+  .deck-tools .how { grid-area: how; }
+  .deck-tools .pdf { grid-area: pdf; }
+  .deck-tools .html { grid-area: html; }
+  .deck-scroll { inset: 56px 0; padding: 4px 8px 24px; }
+
+  .explain, .models { padding: 20px 16px; }
+  .explain-head h2 { font-size: 26px; }
+  .steps > li { padding-left: 38px; }
+  .calc { flex-wrap: wrap; gap: 2px 12px; }
+  .reqs.met { grid-template-columns: 1fr; }
+  .model-grid { grid-template-columns: 1fr; }
+  .save-prompt { padding: 22px 18px 18px; }
+  .save-prompt h2 { font-size: 26px; }
+  .save-actions { flex-direction: column-reverse; }
+  .save-actions .btn { height: 42px; }
+  .save-actions .ghost { margin: 0; padding: 0 14px; }
+}
 
 @page { size: A4; margin: 0; }
 

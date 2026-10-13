@@ -142,7 +142,7 @@ export function Entry({ still, frame, onGlow }: { still: boolean; frame: RefObje
   useEffect(() => {
     const canvas = ref.current!
     const ctx = canvas.getContext('2d')!
-    let fit = { s: 1, ox: 0, oy: 0, dpr: 1 }
+    let fit = { s: 1, ox: 0, oy: 0, dpr: 1, cx: 0, cy: 0, tall: false }
     let t = still ? 1.2 : 0, intro = still ? 1 : 0
 
     const paint = () => {
@@ -152,10 +152,15 @@ export function Entry({ still, frame, onGlow }: { still: boolean; frame: RefObje
       const q = still ? 0 : clamp01(scrollY / innerHeight)
       const k = Math.exp((Math.min(q, 0.94) / 0.94) * Math.log(ZOOM))
       const travel = DOOR * (1 - 1 / k) - 0.3 * (1 - smooth(intro))
+      // na tela em pé a arte fica no alto, com o texto embaixo: logo que o texto sai, o ponto de fuga
+      // desce ao meio da tela, e a parede e o vão crescem por igual para os quatro lados
+      const c = smooth((q - 0.08) / 0.24)
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.setTransform(fit.dpr * fit.s, 0, 0, fit.dpr * fit.s, fit.dpr * fit.ox, fit.dpr * fit.oy)
-      draw(ctx, fit.s, t, travel, smooth((q - 0.3) / 0.45), smooth((q - 0.08) / 0.26), smooth(intro * 1.6))
+      ctx.setTransform(fit.dpr * fit.s, 0, 0, fit.dpr * fit.s, fit.dpr * (fit.ox + fit.cx * c), fit.dpr * (fit.oy + fit.cy * c))
+      // a moldura, o L e os degraus se apagam cedo (na tela em pé, junto com o texto que sai por baixo deles)
+      const out = fit.tall ? smooth((q - 0.02) / 0.18) : smooth((q - 0.08) / 0.26)
+      draw(ctx, fit.s, t, travel, smooth((q - 0.3) / 0.45), out, smooth(intro * 1.6))
       // no fim da entrada a tela fica toda no escuro da página, em qualquer formato de tela
       const night = smooth((q - 0.9) / 0.08)
       if (night > 0) {
@@ -176,7 +181,10 @@ export function Entry({ still, frame, onGlow }: { still: boolean; frame: RefObje
       canvas.width = Math.round(cw * dpr)
       canvas.height = Math.round(ch * dpr)
       const s = Math.min(box.width / (ART + 30), box.height / (ART + 30))
-      fit = { s, ox: box.left - own.left + (box.width - ART * s) / 2, oy: box.top - own.top + (box.height - ART * s) / 2, dpr }
+      const ox = box.left - own.left + (box.width - ART * s) / 2, oy = box.top - own.top + (box.height - ART * s) / 2
+      // o caminho até o meio da tela, só na tela em pé (no desktop a arte já fica na altura do meio)
+      const tall = ch > cw
+      fit = { s, ox, oy, dpr, cx: tall ? cw / 2 - (ox + FUGA[0] * s) : 0, cy: tall ? ch / 2 - (oy + FUGA[1] * s) : 0, tall }
       paint()
     }
     const ro = new ResizeObserver(resize)

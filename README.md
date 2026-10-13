@@ -29,8 +29,8 @@ A LP abre em `/` e o Maker em `/#builder` (cada um carrega à parte). O nome ao 
 
 - O board abre reto e de frente, com a chegada (sul) embaixo (`src/three/view.ts`).
 - Um clique numa das laterais gira o board 90°: a lateral clicada vem para a frente. Passar o mouse sobre ela mostra o realce e a seta do giro.
-- A roda do mouse aproxima ou afasta. Não há órbita livre nem arrasto com o botão direito.
-- O enquadramento cabe o board na área que a interface deixa livre: acima do questionário (que muda de altura) e, com o checklist aberto, à esquerda dele.
+- A roda do mouse aproxima ou afasta. No toque, a pinça com dois dedos faz o mesmo, e a página não amplia por cima do board. Não há órbita livre nem arrasto com o botão direito.
+- O enquadramento cabe o board na área que a interface deixa livre: acima do questionário (que muda de altura) e, com o checklist aberto, à esquerda dele (no celular, acima dele).
 
 ## Desempenho
 
@@ -83,12 +83,13 @@ Segue as notas do cofre sobre rolagem e GSAP: a rolagem é de quem lê, cada pas
    - Na entrada, a retícula é recortada por retângulos (todas as formas são retas), o que evita máscara de tela inteira, e só os pontos que caem na tela são desenhados: a página segue a 60 quadros por segundo com a câmera bem perto.
    - O fundo deixou de ser preto chapado: um respiro creme no alto, coral embaixo e um brilho coral atrás da cena, que some junto com ela na entrada (só opacidade, sem repintar).
    - No cartão de vidro, o que o Maker entrega, sem estimativa: 8 respostas, 10 anos projetados e 6 folhas A4, com "Do terreno ao retorno, num estudo só." embaixo.
+   - No celular e no tablet em pé, a arte fica no alto com a altura que o texto deixa, e o texto inteiro (título numa linha, os dois botões lado a lado e o cartão) cabe na tela presa. Com a rolagem, o texto sai mais cedo e descendo, a moldura, o L e os degraus se apagam junto com ele, e o ponto de fuga desce ao meio da tela: o vão cresce por igual e cobre a tela como no desktop.
 2. **Como funciona**, em quatro passos que levam às perguntas: defina seus critérios, confira as restrições, entenda os cálculos (com o caixa em 10 anos desenhado na rolagem) e organize seu relatório. Cada passo traz um exemplo do resort de exemplo.
    - A cada passo, um grupo novo de oito ou nove elementos desce do céu enquanto o anterior segue descendo até sumir, sem quique e quase sem giro. A posição é função da rolagem (scrub com inércia), então voltar desfaz. Cada peça vira poucas malhas ao montar.
    - Cada passo ocupa uma tela de rolagem, com as trocas cruzando em volta da mudança do texto e quase nenhuma rolagem parada. Entre as trocas, a composição gira devagar com a rolagem (cerca de 11° por passo, até as perguntas cobrirem), então qualquer rolagem, por menor que seja, mexe a cena. Medido de 60 em 60 px: as 84 posições mudam a imagem.
    - Na última tela da seção, as perguntas sobem por cima, com o texto e os elementos parados.
 3. **Perguntas que visam o futuro**: as sete perguntas de negócio do questionário e o que cada uma muda.
-4. **Analise à frente do tempo**: as seis folhas A4 do relatório do exemplo, com a fachada fotografada pelo próprio 3D, saem da pilha e abrem em leque com a rolagem (no celular, uma fila para deslizar). O leque lê as medidas uma vez e só escreve transform, que a placa de vídeo compõe. Um clique numa folha abre o leitor nela.
+4. **Analise à frente do tempo**: as seis folhas A4 do relatório do exemplo, com a fachada fotografada pelo próprio 3D, saem da pilha e abrem em leque com a rolagem (no celular, uma fila para deslizar). O leque lê as medidas uma vez e só escreve transform, que a placa de vídeo compõe. Uma folha tocada ou clicada abre o leitor nela. No celular, o leitor tem fundo cheio e margens menores, e as folhas ficam maiores.
 5. **Chamada final** no coral da contracapa, com o chapéu.
 
 Todos os números da LP saem do motor, em faixa, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, a abertura não fica presa, a parede com a porta aparece parada, como na arte, cada passo mostra o seu grupo já pousado e nada anima.
@@ -261,10 +262,22 @@ A imagem de cada modelo é fotografada do próprio layout 3D, de frente como o b
 
 ## Controles
 
-- Clique numa lateral do board para girá-lo 90°; a roda do mouse aproxima ou afasta.
+- Clique ou toque numa lateral do board para girá-lo 90°. A roda do mouse ou a pinça aproxima ou afasta.
 - `Esc` fecha a janela aberta.
 - O logo na barra superior volta à LP. "Começar meu projeto", na LP, abre sempre o board vazio.
 - O tema padrão é o claro. O botão de sol/lua alterna, e a escolha fica salva no navegador.
+
+## Celular e tablet
+
+Testado no toque em 360 × 740, 375 × 812, 768 × 1024, e também em 1024 × 768 e 1440 × 900: nada passa da largura da tela, e o caminho inteiro, do nome ao relatório, funciona no toque.
+
+- **Barra de cima** (até 960 px): ficam o logo, o nome do projeto, Salvar e o menu ⋯ com tema, Abrir esboço, Modelos, Limpar e Ver relatório. O menu fecha com um toque fora dele, com `Esc` ou depois da escolha.
+- **Questionário** (até 960 px): em coluna. No alto, a contagem e o progresso, com Como calculamos e o botão do relatório no canto. Embaixo, a pergunta com as opções em grade (duas colunas no celular) e, no pé, as faixas de investimento e de EBITDA. As etiquetas das respostas viram uma fila para deslizar.
+- **Controle de números**: quebra em linhas quando não cabe numa só, em qualquer largura (no desktop estreito, os atalhos encolhem antes). No celular, vêm o número com a régua, depois os atalhos e por fim os botões.
+- **Checklist** (celular): uma folha no pé da tela, com o board no espaço livre acima. "Gerar relatório" ocupa a largura toda.
+- **Relatório** (celular): checklist e Fechar no alto, Como calculamos, PDF e HTML no pé, e as folhas passando entre as duas barras, sobre fundo cheio.
+- **Aviso para salvar** (celular): Salvar em cima, na largura toda, com "Agora não" e "Não mostrar novamente" embaixo.
+- **Toque**: um toque na lateral gira o board e a pinça aproxima ou afasta. O aviso de chegada diz "Toque" no lugar de "Clique", e o campo do nome não abre o teclado sozinho. Os realces de passar o mouse só valem onde há mouse: no toque, o realce grudava no último botão tocado e parecia seleção.
 
 ## Esboços
 
