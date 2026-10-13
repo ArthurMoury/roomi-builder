@@ -48,13 +48,14 @@ const TURN = -0.4 // a composição vista em três quartos (quartos de volta da 
 const BOUNDS = { x0: -8.2, x1: 9, z0: -5.6, z1: 6.6 } // o que precisa caber no quadro
 const SKY = 16    // de quanto acima as peças descem
 const DEPTH = 16  // quanto as que saem descem até sumir
-// janelas da troca, em unidades de p: o grupo g entra em [g − 0,6, g − 0,25] e sai em [g + 0,25, g + 0,6];
-// a saída de um e a entrada do próximo se encostam em p = g + 0,5, onde o texto da etapa muda
-const IN_FROM = 0.6, IN_TO = 0.25, OUT_FROM = 0.25, OUT_TO = 0.6
+// janelas da troca, em unidades de p (uma tela de rolagem por passo): o grupo g entra em [g − 0,55,
+// g − 0,1] e sai em [g + 0,1, g + 0,55]; a saída de um e a entrada do próximo se cruzam em volta de
+// p = g + 0,5, onde o texto da etapa muda. Quase não sobra rolagem parada, e o giro lento da composição
+// (Turntable) cobre o resto: qualquer rolagem, por menor que seja, mexe a cena
+const IN_FROM = 0.55, IN_TO = 0.1, OUT_FROM = 0.1, OUT_TO = 0.55
+const TURN_STEP = 0.12 // quartos de volta por passo (cerca de 11°)
 // cascata dentro do grupo: as peças entram espalhadas em 45% da janela e saem em 30%
 const IN_SPREAD = 0.45, OUT_SPREAD = 0.3
-// o primeiro grupo cai 0,2 depois, com a abertura (opaca) já quase fora da tela
-const FIRST_LAG = 0.2
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10) // sai e chega devagar
@@ -80,7 +81,7 @@ function PieceView({ piece, g, j, n }: { piece: Piece; g: number; j: number; n: 
   const spin = j % 2 ? 1 : -1
   const lag = n > 1 ? j / (n - 1) : 0
   useFrame(() => {
-    const into = clamp01((fall.p - (g - IN_FROM + (g === 1 ? FIRST_LAG : 0))) / (IN_FROM - IN_TO))
+    const into = clamp01((fall.p - (g - IN_FROM)) / (IN_FROM - IN_TO))
     const away = g === LAST ? 0 : clamp01((fall.p - (g + OUT_FROM)) / (OUT_TO - OUT_FROM))
     const u = clamp01((into - lag * IN_SPREAD) / (1 - IN_SPREAD))
     const v = clamp01((away - lag * OUT_SPREAD) / (1 - OUT_SPREAD))
@@ -103,6 +104,12 @@ function PieceView({ piece, g, j, n }: { piece: Piece; g: number; j: number; n: 
       <group ref={model}>{merged ? <primitive object={merged} /> : <Model id={piece.id} w={it.w} d={it.d} />}</group>
     </group>
   )
+}
+
+// A composição gira devagar com a rolagem, em todos os passos; com movimento reduzido, fica parada
+function Turntable({ still }: { still: boolean }) {
+  useFrame(() => { if (!still) view.turn = TURN + fall.p * TURN_STEP })
+  return null
 }
 
 // Com movimento reduzido o canvas só desenha quando a etapa muda
@@ -135,6 +142,7 @@ export default function Showcase({ beat, inset, paused, still, wantPhoto, onPhot
       <ambientLight intensity={0.55} />
       <directionalLight position={[6, 14, 3]} intensity={1.6} />
       {GROUPS.map((group, i) => group.map((piece, j) => <PieceView key={`${i}-${j}`} piece={piece} g={i + 1} j={j} n={group.length} />))}
+      <Turntable still={still} />
       <CameraRig wheel={false} />
       <Rig />
       {still && <Redraw beat={beat} />}

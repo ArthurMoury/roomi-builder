@@ -39,7 +39,7 @@ A LP abre em `/` e o Maker em `/#builder` (cada um carrega à parte). O nome ao 
 - Nenhum item roda código por quadro, e o ponteiro só testa o terreno, não as centenas de peças.
 - O mapa para de desenhar enquanto o relatório, a galeria ou a explicação o cobrem. Na LP, o 3D para quando as seções claras o cobrem.
 - A resolução do canvas é fixa: a da tela, até 2×. Baixá-la quando a obra pesa deixava o mapa borrado depois de escolher a categoria.
-- A abertura da LP é a porta em Canvas 2D, que não depende do three.js. O 3D dos passos carrega no primeiro respiro do navegador (ou na primeira rolagem) e só desenha depois que a abertura começa a sair. Sem WebGL, a planta estática fica.
+- A abertura da LP é a parede com a porta em Canvas 2D, que não depende do three.js; com a câmera entrando pela porta, só os pontos da retícula que caem na tela são desenhados. O 3D dos passos carrega no primeiro respiro do navegador (ou na primeira rolagem) e só desenha depois que a abertura começa a sair. Sem WebGL, a planta estática fica.
 - Fontes em WOFF2 só com o latim (fontTools): 479 kB viraram 142 kB. O chapéu da contracapa e da LP virou PNG de 51 kB (o SVG tinha 683 kB e 844 caminhos).
 - Na LP, em rede 4G e CPU de celular, com cache frio: de 1.086 kB para 614 kB transferidos, LCP de 2,7–3,2 s para 2,5 s e tarefas longas de 3,1–3,8 s para 2,2 s.
 - Na troca grande de elementos (Resort para All Inclusive com 300 UHs), as tarefas longas caíram de 86 (9,8 s) para 8 (1 s):
@@ -59,7 +59,7 @@ A LP abre em `/` e o Maker em `/#builder` (cada um carrega à parte). O nome ao 
 - Temas escuro e claro (o claro é o padrão). No claro, o coral fica só em preenchimentos e bordas, porque texto coral sobre creme reprova em contraste.
 - Logo: o wordmark oficial (`public/roomi-wordmark.svg`, copiado de `RoomiVault/deck/marca`), aplicado por máscara CSS para seguir a cor do tema.
 - Favicon: a porta da marca em miniatura (sala escura, porta creme entreaberta e a luz coral), em SVG, `.ico` de 16 a 48 px e o ícone de 180 px para o iPhone.
-- A exceção ao "sem degradê" é a abertura da LP: a luz coral da porta tinge a sala, e o vidro (cofre: design › estilos › Glassmorphism, com camada de barreira) fica na barra do topo e no cartão dos números, onde há cor atrás para desfocar.
+- A exceção ao "sem degradê" é a abertura da LP: um brilho coral atrás da cena tinge a sala, e o vidro (cofre: design › estilos › Glassmorphism, com camada de barreira) fica na barra do topo e no cartão dos números, onde há cor atrás para desfocar.
 
 ## O mar
 
@@ -76,20 +76,20 @@ No destino praia, o mar é um bloco de maquete encostado na divisa de água do m
 
 Segue as notas do cofre sobre rolagem e GSAP: a rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com `position: sticky` e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido.
 
-1. **Abertura**: "Simulador de resorts / Comece seu sonho / com a Roomi", no título em três linhas da capa dos PDFs, e a porta da Roomi com o fundo (RoomiVault › design › Formas geométricas da marca, "Porta que abre"), em Canvas 2D (`src/lp/Door.tsx`).
-   - Parede escura, porta creme, a luz coral do quarto, a bandeira e o piso em meio-tom, redesenhados nas coordenadas da arte. Tema escuro do molde: ponto creme e contorno creme a 55%.
-   - Ao carregar, a porta sai fechada e abre numa mola, e a luz coral cresce com o vão. Parada, balança devagar (ciclo de 9 s).
-   - Com o mouse em cima, a porta segue o mouse (para a direita abre), e um clique a empurra: ela escancara e volta balançando. Cada vértice anda com o mouse em paralaxe; a retícula do chão engrossa perto da soleira quando entra luz e corre mais quando a porta mexe; a bandeira pega o vento dela.
-   - Com a rolagem, a porta abre de vez. A abertura é opaca e sobe como uma cortina sobre o 3D dos passos.
-   - O fundo deixou de ser preto chapado: um respiro creme no alto, coral embaixo e um brilho coral atrás da porta, que fica mais forte quanto mais ela abre (só opacidade, sem repintar).
+1. **Abertura**: "Simulador de resorts / Comece seu sonho / com a Roomi", no título em três linhas da capa dos PDFs, e a parede com a porta da Roomi (RoomiVault › design › Formas geométricas da marca, "Degraus" e "Entrada com GSAP"), em Canvas 2D (`src/lp/Entry.tsx`).
+   - A parede creme com a moldura da porta, o L coral, o vão em meio-tom e a massa em degraus, redesenhados nas coordenadas da arte, com o plano coral deslocado atrás da parede.
+   - Ao carregar, as camadas vêm do fundo e se assentam. Parada, uma onda de luz caminha pela retícula dos degraus e o L coral sobe e desce como porta de elevador. Com o mouse, as camadas andam em paralaxe pela profundidade e os pontos incham perto dele.
+   - A abertura fica presa por uma tela de rolagem (sticky): o texto sai primeiro e a câmera entra pela porta. Cada camada cresce em volta do ponto de fuga no vão, a de perto mais rápido que a do fundo, e os pontos crescem como lupa. No fim tudo some no escuro da página e os passos sobem.
+   - O fundo deixou de ser preto chapado: um respiro creme no alto, coral embaixo e um brilho coral atrás da cena, que some junto com ela na entrada (só opacidade, sem repintar).
 2. **Como funciona**, em quatro passos que levam às perguntas: defina seus critérios, confira as restrições, entenda os cálculos (com o caixa em 10 anos desenhado na rolagem) e organize seu relatório. Cada passo traz um exemplo do resort de exemplo.
    - A cada passo, um grupo novo de oito ou nove elementos desce do céu enquanto o anterior segue descendo até sumir, sem quique e quase sem giro. A posição é função da rolagem (scrub com inércia), então voltar desfaz. Cada peça vira poucas malhas ao montar.
+   - Cada passo ocupa uma tela de rolagem, com as trocas cruzando em volta da mudança do texto e quase nenhuma rolagem parada. Entre as trocas, a composição gira devagar com a rolagem (cerca de 11° por passo, até as perguntas cobrirem), então qualquer rolagem, por menor que seja, mexe a cena. Medido de 60 em 60 px: as 84 posições mudam a imagem.
    - Na última tela da seção, as perguntas sobem por cima, com o texto e os elementos parados.
 3. **Perguntas que visam o futuro**: as sete perguntas de negócio do questionário e o que cada uma muda.
-4. **O relatório**: as seis folhas A4 do exemplo, com a fachada fotografada pelo próprio 3D, saem da pilha e abrem em leque com a rolagem (no celular, uma fila para deslizar). O leque lê as medidas uma vez e só escreve transform, que a placa de vídeo compõe. Um clique numa folha abre o leitor nela.
+4. **Analise à frente do tempo**: as seis folhas A4 do relatório do exemplo, com a fachada fotografada pelo próprio 3D, saem da pilha e abrem em leque com a rolagem (no celular, uma fila para deslizar). O leque lê as medidas uma vez e só escreve transform, que a placa de vídeo compõe. Um clique numa folha abre o leitor nela.
 5. **Chamada final** no coral da contracapa, com o chapéu.
 
-Todos os números da LP saem do motor, em faixa, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, a porta aparece parada, como na arte, cada passo mostra o seu grupo já pousado e nada anima.
+Todos os números da LP saem do motor, em faixa, para o primeiro modelo da galeria (all inclusive pé na areia, 300 UHs), com o investimento completo (`src/lp/example.ts`). Com movimento reduzido, a abertura não fica presa, a parede com a porta aparece parada, como na arte, cada passo mostra o seu grupo já pousado e nada anima.
 
 ## Cálculo (`src/lib/valuation.ts`)
 

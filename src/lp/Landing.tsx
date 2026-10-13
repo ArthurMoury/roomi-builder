@@ -3,7 +3,7 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import type { Inset } from '../three/view'
 import { PAGE_H, PAGE_W, ReportSheets } from '../ui/ReportSheets'
-import { Door } from './Door'
+import { Entry } from './Entry'
 import { Plan } from './Plan'
 import { BIZ, EV, MODEL, SHOW } from './example'
 import { fall } from './motion'
@@ -15,10 +15,10 @@ gsap.registerPlugin(ScrollTrigger)
 
 // LP que antecede o Maker. Segue o cofre (design › Animação de rolagem e bibliotecas › GSAP): a
 // rolagem é de quem lê, cada passo muda uma coisa visível, o palco fica preso com position: sticky
-// e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. Na abertura, a porta da
-// Roomi abre em Canvas 2D e a luz coral dela tinge a sala; nos passos, os elementos do resort caem do
-// céu no 3D, que só carrega depois da abertura (com a planta estática no lugar enquanto isso, ou de
-// vez, sem WebGL). Todos os números saem do motor, para o resort de exemplo.
+// e o ScrollTrigger só mede o progresso. Texto só se move antes de ser lido. Na abertura, presa por uma
+// tela, a parede com a porta da Roomi (Canvas 2D) leva a câmera porta adentro com a rolagem; nos passos,
+// os elementos do resort caem do céu no 3D, que só carrega depois da abertura (com a planta estática no
+// lugar enquanto isso, ou de vez, sem WebGL). Todos os números saem do motor, para o resort de exemplo.
 
 const Showcase = lazy(() => import('./Showcase'))
 
@@ -106,6 +106,7 @@ export default function Landing({ onStart }: { onStart: () => void }) {
   const [heroOn, setHeroOn] = useState(true)  // a abertura, opaca, cobre o 3D
   const [want3d, setWant3d] = useState(false) // o 3D carrega depois da abertura
   const glow = useRef<HTMLDivElement>(null)
+  const frame = useRef<HTMLDivElement>(null) // onde a parede com a porta fica parada
   const [still] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [inset, setInset] = useState(() => insetFor(innerWidth, innerHeight))
   const [photo, setPhoto] = useState<string | null>(null)
@@ -150,8 +151,11 @@ export default function Landing({ onStart }: { onStart: () => void }) {
         const { motion, desk } = c.conditions as { motion: boolean; desk: boolean }
         if (!motion) return
         // o livro sai e os elementos caem do céu com a rolagem, num scrub com inércia: um leve atraso, sem tranco
-        gsap.fromTo(fall, { p: 0 }, { p: P_MAX, ease: 'none', scrollTrigger: { trigger: build, start: 'top bottom', end: span, scrub: 1.2, invalidateOnRefresh: true } })
+        // vai uma tela além dos passos: enquanto as perguntas sobem por cima, a composição segue girando
+        gsap.fromTo(fall, { p: 0 }, { p: P_MAX + 1, ease: 'none', scrollTrigger: { trigger: build, start: 'top bottom', end: () => `+=${build.offsetHeight}`, scrub: 1.2, invalidateOnRefresh: true } })
         gsap.from('.lp-hero .rise', { y: 12, opacity: 0, duration: 0.42, stagger: 0.07, ease: 'power2.out', delay: 0.1 })
+        // na abertura presa, o texto sai antes de a câmera entrar pela porta
+        gsap.to('.lp-hero .col', { opacity: 0, y: -48, ease: 'none', scrollTrigger: { trigger: '.lp-hero', start: 'top top', end: () => `+=${innerHeight * 0.32}`, scrub: 0.4, invalidateOnRefresh: true } })
         // perguntas entram 12 px em 260 ms, uma depois da outra
         gsap.set('.lp-q', { opacity: 0, y: 12 })
         ScrollTrigger.batch('.lp-q', {
@@ -229,8 +233,8 @@ export default function Landing({ onStart }: { onStart: () => void }) {
       removeEventListener('scroll', go)
     }
   }, [])
-  // a luz da porta tinge a sala: quanto mais aberta, mais forte o brilho coral (só opacidade, sem repintar)
-  const onLight = useCallback((open: number) => { if (glow.current) glow.current.style.opacity = (0.45 + 0.55 * open).toFixed(3) }, [])
+  // o brilho coral da sala acompanha a cena e some junto com ela na entrada (só opacidade, sem repintar)
+  const onGlow = useCallback((v: number) => { if (glow.current) glow.current.style.opacity = v.toFixed(3) }, [])
 
   const onPhoto = useCallback((url: string) => { setPhoto(url); setWantPhoto(false) }, [])
   const start = (e?: MouseEvent) => {
@@ -262,14 +266,16 @@ export default function Landing({ onStart }: { onStart: () => void }) {
       </header>
 
       <section className="lp-hero">
+        <div className="lp-hero-stick">
         <div className="lp-glow" ref={glow} aria-hidden="true" />
+        <Entry still={still} frame={frame} onGlow={onGlow} />
         <div className="col">
           <h1 className="lp-title">
             <span className="t1 rise">Simulador de resorts</span>
             <span className="t2 rise">Comece seu sonho</span>
             <span className="t3 rise">com a Roomi</span>
           </h1>
-          <p className="lp-desc rise">Responda oito perguntas e veja o resort se montar em 3D, num terreno de 4 hectares. O relatório sai em folhas A4, com investimento, operação e retorno em 10 anos.</p>
+          <p className="lp-desc rise">Oito perguntas de negócio mostram quanto o seu resort custa, quanto fatura e em quanto tempo se paga. O hotel se monta em 3D enquanto você responde, e o estudo sai em faixas, pronto para a mesa de decisão.</p>
           <div className="lp-ctas rise">
             <a className="lp-btn" href="#builder" onClick={start}>Começar meu projeto</a>
             <button className="lp-btn ghost" onClick={() => go('.lp-build')}>Ver como funciona</button>
@@ -281,7 +287,8 @@ export default function Landing({ onStart }: { onStart: () => void }) {
           </div>
           <p className="lp-note rise">Exemplo: {MODEL.name.toLowerCase()}, montado no Maker.</p>
         </div>
-        <div className="lp-door" aria-hidden="true"><Door still={still} onLight={onLight} /></div>
+        <div className="lp-door" ref={frame} aria-hidden="true" />
+        </div>
       </section>
 
       <section className="lp-build" aria-label="Como funciona, passo a passo">
@@ -316,8 +323,8 @@ export default function Landing({ onStart }: { onStart: () => void }) {
       </section>
 
       <section className="lp-report">
-        <h2 className="lp-h2">O estudo sai em <span className="hl">seis folhas A4</span>.</h2>
-        <p className="lp-lede">Este é o relatório do exemplo, gerado pelo Maker: a capa com a fachada, o hotel em números, a operação, o caixa em 10 anos, valor e risco, e as premissas. Clique numa folha para ler.</p>
+        <h2 className="lp-h2">Analise <span className="hl">à frente do tempo</span>.</h2>
+        <p className="lp-lede">O relatório do exemplo, gerado pelo Maker, traz para hoje os próximos 10 anos do resort: investimento, operação, caixa, valor e risco, em seis folhas A4 e sempre em faixas. Clique numa folha para ler.</p>
         <div className="sheets lp-deck" style={{ '--s': 0.38 } as CSSProperties} onClick={openSheet}>{report}</div>
         <button className="lp-btn ghost lp-read" onClick={() => setReading(0)}>Ler o relatório do exemplo</button>
       </section>
